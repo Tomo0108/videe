@@ -6,6 +6,9 @@ test('malformed settings recover to safe playback and UI values',()=>{
   const settings=normalizePreferences({speed:99,volume:7,resume:'false',repeat:'invalid',theme:'invalid',layout:'invalid',sort:'invalid'});
   assert.equal(settings.speed,1);assert.equal(settings.volume,1);assert.equal(settings.resume,true);
   assert.equal(settings.repeat,'off');assert.equal(settings.theme,'system');assert.equal(settings.layout,'grid');
+  assert.equal(defaults.motion,true);
+  assert.equal(normalizePreferences({motion:false}).motion,false);
+  assert.equal(normalizePreferences({motion:'off'}).motion,true);
   assert.equal(normalizePreferences({volume:NaN}).volume,0.8);
   assert.equal(normalizePreferences({volume:-1}).volume,0);
 });

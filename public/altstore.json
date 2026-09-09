@@ -1,0 +1,28 @@
+{
+  "name": "Videe",
+  "identifier": "app.videe.source",
+  "sourceURL": "https://videe-zeta.vercel.app/altstore.json",
+  "apps": [
+    {
+      "name": "Videe",
+      "bundleIdentifier": "app.videe.player",
+      "developerName": "Videe",
+      "subtitle": "A local video player",
+      "localizedDescription": "Play videos that already live on this device. Sideload with AltStore or Sideloadly.",
+      "iconURL": "https://videe-zeta.vercel.app/icons/icon-512.png",
+      "tintColor": "1F5FD0",
+      "category": "entertainment",
+      "appPermissions": {},
+      "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "1",
+          "date": "2026-09-09",
+          "localizedDescription": "First sideload build.",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/latest/download/Videe-0.1.0-ios.ipa",
+          "minOSVersion": "15.0"
+        }
+      ]
+    }
+  ]
+}

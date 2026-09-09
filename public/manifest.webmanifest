@@ -5,7 +5,7 @@
   "description": "Videe",
   "lang": "en",
   "dir": "ltr",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

@@ -1,6 +1,6 @@
-/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size' }} Preferences */
+/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', motion: boolean }} Preferences */
 /** @type {Preferences} */
-export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'grid', sort: 'recent' };
+export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'grid', sort: 'recent', motion: true };
 /** Validate persisted settings, including migration from the original autoplay setting.
  * @param {unknown} value
  * @returns {Preferences}
@@ -19,6 +19,7 @@ export function normalizePreferences(value) {
   if (data.theme === 'system' || data.theme === 'light' || data.theme === 'dark') result.theme = data.theme;
   if (data.layout === 'grid' || data.layout === 'list') result.layout = data.layout;
   if (data.sort === 'recent' || data.sort === 'name' || data.sort === 'duration' || data.sort === 'size') result.sort = data.sort;
+  if (typeof data.motion === 'boolean') result.motion = data.motion;
   return result;
 }
 /** @param {number} index @param {number} length @param {Preferences['repeat']} repeat @param {boolean} autoAdvance */

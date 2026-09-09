@@ -4,6 +4,12 @@ import { readFile } from 'node:fs/promises';
 const browser=await chromium.launch({channel:'chromium',headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:940}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
+const dialogReady=async()=>{
+  const dialog=page.locator('dialog');
+  await dialog.waitFor();
+  await dialog.evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
+};
 const fits=async selector=>{const r=await page.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:innerWidth};});assert.ok(r.left>=0&&r.right<=r.width,`${selector} fits horizontally: ${JSON.stringify(r)}`);};
 try {
   await page.goto('http://127.0.0.1:5173');
@@ -13,45 +19,54 @@ try {
   await page.locator('input[type=file]').first().setInputFiles([{name:'A long video title to verify truncation.mp4',mimeType:'video/mp4',buffer},{name:'Second.mp4',mimeType:'video/mp4',buffer}]);
   await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
   await page.getByRole('button',{name:'Back to library'}).click();
+  await page.locator('.video-card').first().evaluate(el=>Promise.all(el.getAnimations().map(a=>a.finished.catch(()=>{}))));
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:940});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     await page.locator('.file-menu summary').first().click();await fits('.file-menu[open] .menu-panel');
-    await page.getByRole('button',{name:'Video info',exact:true}).click();await fits('dialog');
-    await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'Video info',exact:true}).click();await dialogReady();await fits('dialog');
+    await page.keyboard.press('Escape');await dialogGone();
   }
   await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await dialogReady();
   await page.getByRole('combobox',{name:'Appearance'}).selectOption('dark');
   await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
   await page.screenshot({path:'/tmp/videe-tahoe-settings-dark.png',animations:'disabled'});
   await page.keyboard.press('Escape');
+  await dialogGone();
   await page.screenshot({path:'/tmp/videe-tahoe-library-dark.png',animations:'disabled'});
   const cdp=await page.context().newCDPSession(page);
   await cdp.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-transparency',value:'reduce'},{name:'prefers-reduced-motion',value:'reduce'}]});
   assert.equal(await page.locator('.library-sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'none');
   assert.ok(await page.locator('.library-sidebar').evaluate(el=>!getComputedStyle(el).backgroundColor.startsWith('rgba')));
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--duration-sheet').trim()),'.2s');
+  assert.notEqual(await page.locator('.video-card').first().evaluate(el=>getComputedStyle(el).animationName),'none');
   await cdp.send('Emulation.setEmulatedMedia',{features:[]});
   await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await dialogReady();
   await page.getByRole('combobox',{name:'Appearance'}).selectOption('light');
   await page.waitForFunction(()=>document.documentElement.dataset.theme==='light');
   assert.equal(await page.locator('.setting-row').first().evaluate(el=>getComputedStyle(el).fontSize),'13px');
   assert.equal(await page.locator('.modal-head h2').evaluate(el=>getComputedStyle(el).fontSize),'17px');
   await page.screenshot({path:'/tmp/videe-tahoe-settings-light.png',animations:'disabled'});
   await page.keyboard.press('Escape');
+  await dialogGone();
   await page.screenshot({path:'/tmp/videe-tahoe-library-light.png',animations:'disabled'});
   await page.locator('.video-open').first().click();await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
   for(const size of [{width:320,height:700},{width:390,height:844},{width:844,height:390},{width:1440,height:940}]) {
     await page.setViewportSize(size);await fits('.player-controls');
     assert.ok(await page.locator('.player-controls').evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight));
-    await page.getByRole('button',{name:'Settings',exact:true}).click();await fits('dialog');
+    await page.getByRole('button',{name:'Settings',exact:true}).click();await dialogReady();await fits('dialog');
     const expected=size.width<=700?'17px':'13px';
     assert.equal(await page.locator('.setting-row').first().evaluate(el=>getComputedStyle(el).fontSize),expected);
     if(size.width===390) await page.screenshot({path:'/tmp/videe-type-mobile.png',animations:'disabled'});
     assert.ok(await page.locator('dialog').evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
     await page.keyboard.press('Escape');
+    await dialogGone();
   }
   await page.screenshot({path:'/tmp/videe-tahoe-player.png',animations:'disabled'});
   await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await dialogReady();
   await page.evaluate(()=>document.documentElement.style.fontSize='200%');
   assert.equal(await page.locator('.setting-row').first().evaluate(el=>getComputedStyle(el).fontSize),'26px');
   await fits('dialog');

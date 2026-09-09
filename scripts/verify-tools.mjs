@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 const browser=await chromium.launch({channel:'chromium',headless:true});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
  await page.goto('http://127.0.0.1:5173');
  assert.equal(await page.locator('.brand img').getAttribute('src'),'./icon.png');
@@ -18,12 +19,14 @@ try {
  await page.locator('video').evaluate(v=>{v.currentTime=4;});
  await page.getByRole('button',{name:/Set B/}).click();
  await page.getByRole('button',{name:'Close',exact:true}).click();
+ await dialogGone();
  await page.locator('video').evaluate(v=>v.play());
  await page.waitForFunction(()=>document.querySelector('video').currentTime>3.3);
  await page.waitForFunction(()=>{const v=document.querySelector('video');return v.currentTime>=2&&v.currentTime<2.8&&!v.paused;});
  await page.getByRole('button',{name:'Playback tools',exact:true}).click();
  await page.getByRole('button',{name:'Clear loop',exact:true}).click();
  await page.getByRole('button',{name:'Close',exact:true}).click();
+ await dialogGone();
  await page.waitForFunction(()=>document.querySelector('video').currentTime>4.2);
  await page.getByRole('button',{name:'Playback tools',exact:true}).click();
  await page.getByRole('button',{name:'Play queue item Second.mp4',exact:true}).click();
@@ -35,6 +38,7 @@ try {
  assert.ok(await page.locator('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
  await page.screenshot({path:'/tmp/videe-playback-tools.png'});
  await page.getByRole('button',{name:'Close',exact:true}).click();
+ await dialogGone();
  await page.getByRole('button',{name:'Back to library'}).click();
  assert.equal(await page.locator('.continue-feature').count(),0);
  assert.equal(await page.locator('.video-thumbnail img').first().evaluate(el=>getComputedStyle(el).objectFit),'contain');

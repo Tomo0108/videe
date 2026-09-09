@@ -13,8 +13,10 @@
     "preview": "vite preview --host 127.0.0.1",
     "desktop": "npm run build && electron .",
     "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
-    "package:mac": "node scripts/check-platform.mjs darwin && npm run build && electron-builder --mac --dir",
-    "package:win": "node scripts/check-platform.mjs win32 && npm run build && electron-builder --win nsis",
+    "package:mac": "node scripts/check-platform.mjs darwin && npm run build && electron-builder --mac --dir --publish never",
+    "package:mac:dmg": "node scripts/check-platform.mjs darwin && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never",
+    "package:win": "node scripts/check-platform.mjs win32 && npm run build && electron-builder --win nsis --publish never",
+    "package:ios": "node scripts/package-ios.mjs",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios",
     "test": "node --test tests/*.test.mjs",
@@ -34,6 +36,7 @@
     "directories": {
       "output": "release"
     },
+    "publish": null,
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -45,19 +48,26 @@
     "mac": {
       "category": "public.app-category.video",
       "icon": "public/icons/Videe.icns",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
       "target": [
-        "dmg"
-      ]
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "Videe-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "icon": "public/icons/Videe.ico",
       "target": [
         "nsis"
-      ]
+      ],
+      "artifactName": "Videe-${version}-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Videe-${version}-win-setup.exe"
     }
   },
   "dependencies": {

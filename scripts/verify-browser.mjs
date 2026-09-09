@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 const browser = await chromium.launch({ channel:'chromium', headless: true });
 const page = await browser.newPage({ viewport: { width:1440,height:940 } });
 const errors = []; page.on('pageerror', error=>errors.push(error.message));
+const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
   await page.goto('http://127.0.0.1:5173');
   await page.waitForFunction(()=>!document.querySelector('.open-button')?.disabled);
@@ -27,9 +28,11 @@ try {
   assert.equal(await page.locator('video').evaluate(video=>video.textTracks[0].mode),'hidden');
   await page.getByRole('switch',{name:'Show subtitles'}).check();
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await dialogGone();
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   await page.getByRole('switch',{name:'Autoplay',exact:true}).uncheck();
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await dialogGone();
   await page.getByRole('button',{name:'Full screen'}).click();
   await page.waitForFunction(()=>!!document.fullscreenElement);
   await page.getByRole('slider',{name:'Playback position'}).fill('6');
@@ -63,6 +66,7 @@ try {
   await page.locator('summary[aria-label="Options for sample.mp4"]').click();
   await page.getByRole('button',{name:'Remove from library',exact:true}).click();
   await page.getByRole('button',{name:'Remove',exact:true}).click();
+  await dialogGone();
   await page.getByRole('button',{name:'Open video',exact:true}).waitFor();
   await page.reload();
   await page.getByRole('button',{name:'Open video',exact:true}).waitFor();

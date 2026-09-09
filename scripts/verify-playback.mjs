@@ -4,12 +4,14 @@ import { readFile } from 'node:fs/promises';
 const browser=await chromium.launch({channel:'chromium',headless:true});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',error=>errors.push(error.message));
+const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 const settings=async (repeat,advance=false)=>{
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   await page.getByRole('switch',{name:'Autoplay',exact:true}).uncheck();
   await page.getByRole('switch',{name:'Autoplay next',exact:true}).setChecked(advance);
   await page.getByRole('combobox',{name:'Repeat',exact:true}).selectOption(repeat);
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await dialogGone();
 };
 const loaded=()=>page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
 const finish=async()=>{await loaded();await page.locator('video').evaluate(async v=>{v.currentTime=v.duration-0.2;await v.play();});};
@@ -34,6 +36,7 @@ try {
   assert.equal(await page.getByRole('combobox',{name:'Repeat'}).inputValue(),'all');
   assert.equal(await page.getByRole('switch',{name:'Autoplay',exact:true}).isChecked(),false);
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await dialogGone();
   await page.getByRole('combobox',{name:'Sort by'}).selectOption('name');
   await page.getByRole('button',{name:'Play First.mp4'}).click();await loaded();
   await settings('off');
@@ -49,6 +52,7 @@ try {
   await page.getByRole('combobox',{name:'Repeat'}).selectOption('all');
   await page.screenshot({path:'/tmp/videe-playback-settings.png',fullPage:true});
   await page.getByRole('button',{name:'Close',exact:true}).click();
+  await dialogGone();
   assert.ok(await page.evaluate(()=>document.querySelector('.player-controls').getBoundingClientRect().bottom<=innerHeight), 'mobile controls fit vertically');
   await page.screenshot({path:'/tmp/videe-playback-mobile.png',fullPage:true});
   // A one-item filtered queue must also repeat, without loading a new source.

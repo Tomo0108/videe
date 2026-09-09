@@ -1,6 +1,5 @@
-const CACHE = 'videe-shell-v4';
+const CACHE = 'videe-shell-v5';
 const PRECACHE = [
-  './',
   './index.html',
   './manifest.webmanifest',
   './icon.png',
@@ -28,8 +27,13 @@ self.addEventListener('fetch', event => {
   if (url.pathname.endsWith('/sw.js')) return;
   if (request.headers.has('range')) return;
   if (request.destination === 'video' || request.destination === 'audio') return;
+  const marketing = url.pathname === '/' || url.pathname.endsWith('/site.html') || url.pathname.endsWith('/altstore.json');
 
   if (request.mode === 'navigate') {
+    if (marketing) {
+      event.respondWith(fetch(request).catch(() => caches.match('./site.html')));
+      return;
+    }
     event.respondWith(
       fetch(request).then(response => {
         const copy = response.clone();
