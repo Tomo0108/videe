@@ -1,5 +1,6 @@
-const CACHE = 'videe-shell-v5';
+const CACHE = 'videe-shell-v6';
 const PRECACHE = [
+  './app.html',
   './index.html',
   './manifest.webmanifest',
   './icon.png',
@@ -27,19 +28,19 @@ self.addEventListener('fetch', event => {
   if (url.pathname.endsWith('/sw.js')) return;
   if (request.headers.has('range')) return;
   if (request.destination === 'video' || request.destination === 'audio') return;
-  const marketing = url.pathname === '/' || url.pathname.endsWith('/site.html') || url.pathname.endsWith('/altstore.json');
+  const marketing = url.pathname === '/' || /\/(site|index)\.html$/.test(url.pathname);
 
   if (request.mode === 'navigate') {
     if (marketing) {
-      event.respondWith(fetch(request).catch(() => caches.match('./site.html')));
+      event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
       return;
     }
     event.respondWith(
       fetch(request).then(response => {
         const copy = response.clone();
-        void caches.open(CACHE).then(cache => cache.put('./index.html', copy));
+        void caches.open(CACHE).then(cache => cache.put('./app.html', copy));
         return response;
-      }).catch(() => caches.match('./index.html').then(cached => cached || caches.match('./')))
+      }).catch(() => caches.match('./app.html').then(cached => cached || caches.match('./index.html')))
     );
     return;
   }

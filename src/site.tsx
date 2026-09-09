@@ -10,6 +10,8 @@ type Platform = 'mac' | 'win' | 'ios';
 type Asset = { href: string; size: string; available: boolean };
 
 const NAMES = artifactNames();
+const playerHref = import.meta.env.DEV ? '/' : '/app';
+const homeHref = import.meta.env.DEV ? '/site.html' : '/';
 const FALLBACK: Record<Platform, Asset> = {
   mac: { href: latestDownloadUrl(NAMES.mac), size: '', available: true },
   win: { href: latestDownloadUrl(NAMES.win), size: '', available: true },
@@ -59,9 +61,9 @@ function Site() {
     <div className="site">
       <header className="site-header">
         <div className="site-wrap">
-          <a className="brand" href="./site.html" aria-label="Videe home"><img src="./icon.png" alt=""/><span>Videe</span></a>
+          <a className="brand" href={homeHref} aria-label="Videe home"><img src="./icon.png" alt=""/><span>Videe</span></a>
           <nav className="site-nav">
-            <a href="./index.html">Web player</a>
+            <a href={playerHref}>Web player</a>
             <a href={`https://github.com/${RELEASE_REPO}`}>GitHub</a>
           </nav>
         </div>
@@ -75,7 +77,7 @@ function Site() {
             <p className="ja">ブラウザ版は動画をサイト内ストレージへ複製するため、大きなファイルには向きません。各OSアプリは元ファイルを直接開きます。クラウドにもアカウントにも送りません。</p>
             <div className="hero-actions">
               <a className="primary-button" href="#download">Download Videe</a>
-              <a className="secondary-button" href="./index.html">Try a small clip in the browser</a>
+              <a className="secondary-button" href={playerHref}>Try a small clip in the browser</a>
             </div>
           </div>
           <div className="hero-visual"><img src="./promo/library.png" alt="Videe library on desktop"/></div>
@@ -145,7 +147,7 @@ function Site() {
         <section className="site-wrap" style={{ paddingBottom: 72 }}>
           <div className="web-note">
             <p>Need a quick look on a tiny file? The browser player is still here. Anything you care about should go through the apps above.</p>
-            <a className="secondary-button" href="./index.html">Open web player</a>
+            <a className="secondary-button" href={playerHref}>Open web player</a>
           </div>
         </section>
       </main>

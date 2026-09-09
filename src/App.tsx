@@ -145,6 +145,7 @@ export default function App() {
   const index = queue.current.indexOf(activeId || '');
   const info = items.find(item => item.id === infoId);
   const nativeShell = Boolean(window.videe) || Capacitor.isNativePlatform();
+  const siteHref = import.meta.env.DEV ? '/site.html' : '/';
   const destinations = [{id:'all' as View, label:'All videos', icon:Film}, {id:'continue' as View,label:'Continue watching',icon:Clock3}, {id:'favorites' as View,label:'Favorites',icon:Heart}];
   const closePlayer = () => {
     if(conversion !== null) { notify('Cancel the conversion before returning to the library.'); return; }
@@ -212,14 +213,14 @@ export default function App() {
         <div className="welcome-icon"><img src="./icon.png" alt=""/></div><h1>Videe</h1>
         <button className="primary-button open-button" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy || !ready ? <LoaderCircle size={17} className="spin"/> : null}Open video</button>
         <p>or drop a video anywhere</p>
-        {!nativeShell && <p className="web-download-hint">The browser copies each file into site storage, so large videos stall. <a href="./site.html">Download Videe for Mac, Windows, or iOS</a></p>}
+        {!nativeShell && <p className="web-download-hint">The browser copies each file into site storage, so large videos stall. <a href={siteHref}>Download Videe for Mac, Windows, or iOS</a></p>}
       </section> : <section className="library-section" aria-label="Library">
         <div className="library-header">
           <div className="library-title"><p>YOUR COLLECTION</p><h1 key={view}>{view==='all'?'Library':view==='continue'?'Continue watching':'Favorites'}</h1></div>
           <nav className="library-tabs" aria-label="Browse videos">{destinations.map(({id,label})=><button key={id} className={view===id?'selected':''} aria-pressed={view===id} onClick={()=>setView(id)}>{label}</button>)}</nav>
           <label className="search-box"><Search size={16}/><input aria-label="Search videos" placeholder="Search" value={query} onChange={e => setQuery(e.target.value)}/>{query && <button aria-label="Clear search" onClick={() => setQuery('')}><X size={15}/></button>}</label>
         </div>
-        {!nativeShell && <p className="web-download-hint">Large files belong in the native app. <a href="./site.html">Download Videe</a></p>}
+        {!nativeShell && <p className="web-download-hint">Large files belong in the native app. <a href={siteHref}>Download Videe</a></p>}
         <div className="library-toolbar"><span>{filtered.length} {filtered.length===1?'video':'videos'}</span><div><select aria-label="Sort by" value={prefs.sort} onChange={e=>setPrefs({...prefs,sort:e.target.value as Sort})}><option value="recent">Recently played</option><option value="name">Name</option><option value="duration">Longest first</option><option value="size">Largest first</option></select><div className="layout-switch"><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setPrefs({...prefs,layout:'grid'})}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setPrefs({...prefs,layout:'list'})}/></div></div></div>
         {filtered.length > 0 ? <div key={view} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>{filtered.map(item => <article className="video-card" key={item.id}>
           <button className="video-open" onClick={() => void openItem(item)} aria-label={`Play ${item.name}`}>
@@ -248,7 +249,7 @@ export default function App() {
       <label className="setting-row"><span>Repeat</span><select aria-label="Repeat" value={prefs.repeat} onChange={e=>setPrefs({...prefs,repeat:e.target.value as Preferences['repeat']})}><option value="off">Off</option><option value="one">Repeat one</option><option value="all">Repeat all</option></select></label>
       </div><p className="setting-note">{prefs.repeat==='one'?'Play the current video on repeat.':prefs.repeat==='all'?'Play this queue on repeat, from first to last.': 'Playback stops at the end unless Autoplay next is on.'}{prefs.repeat!=='off'?' Repeat takes priority over Autoplay next.':''}</p>
       {active && <button className="setting-action" onClick={() => { setModal(null); void pictureInPicture(); }}><PictureInPicture2 size={17}/>Picture in Picture</button>}
-      {!nativeShell && <a className="setting-action" href="./site.html">Download Mac, Windows, or iOS app</a>}
+      {!nativeShell && <a className="setting-action" href={siteHref}>Download Mac, Windows, or iOS app</a>}
       </section><div className="app-about"><img src="./icon.png" alt="Videe app icon"/><div><strong>Videe</strong><span>Version {appPackage.version}</span></div></div>
       <details className="help-details"><summary>Shortcuts & help</summary><div className="shortcuts">{[['Play / pause','Space'],['Seek back / forward','← / →'],['Full screen','F'],['Mute','M']].map(([label,key]) => <div key={key}><span>{label}</span><kbd>{key}</kbd></div>)}</div><p>Format support depends on your device. The desktop app can convert unsupported videos.</p><p>Your library stays on this device. Clearing browser data removes the saved library.</p></details>
     </Modal>}
