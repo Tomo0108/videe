@@ -1,4 +1,4 @@
-const CACHE = 'videe-shell-v3';
+const CACHE = 'videe-shell-v4';
 const PRECACHE = [
   './',
   './index.html',
