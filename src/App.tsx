@@ -9,7 +9,7 @@ import { isVideo, timeLabel, sizeLabel, toVtt, clampTime } from './media.mjs';
 import { Badge } from './components/ui/badge';
 import { BlurReveal } from './components/ui/blur-reveal';
 import { FlowButton } from './components/ui/flow-button';
-import { GradientWaveText } from './components/ui/gradient-wave-text';
+import { HighlightedText } from './components/ui/highlighted-text';
 import { Kbd } from './components/ui/kbd';
 import { RichButton } from './components/ui/rich-button';
 import { ShimmerText } from './components/ui/shimmer-text';
@@ -230,10 +230,10 @@ export default function App() {
         </div>
       </section> : items.length === 0 ? <section className="start-screen" aria-label="Open video">
         <div className="welcome-icon"><img src="./icon.png" alt=""/></div>
-        {prefs.motion ? <h1><GradientWaveText align="center" repeat paused={!prefs.motion}>Videe</GradientWaveText></h1> : <h1>Videe</h1>}
-        {prefs.motion ? <BlurReveal as="p" className="welcome-tagline" delay={0.15}>A quieter player for the films you already have.</BlurReveal> : <p className="welcome-tagline">A quieter player for the films you already have.</p>}
+        <h1>{prefs.motion ? <HighlightedText>Videe</HighlightedText> : 'Videe'}</h1>
+        {prefs.motion ? <BlurReveal as="p" className="welcome-tagline" delay={0.12}>A quieter player for the films you already have.</BlurReveal> : <p className="welcome-tagline">A quieter player for the films you already have.</p>}
         <RichButton className="primary-button open-button" size="lg" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy || !ready ? <Spinner size="sm" className="spin"/> : null}Open video</RichButton>
-        {prefs.motion ? <ShimmerText className="drop-hint">or drop a video anywhere</ShimmerText> : <p>or drop a video anywhere</p>}
+        <p className="drop-hint">{prefs.motion ? <ShimmerText>or drop a video anywhere</ShimmerText> : 'or drop a video anywhere'}</p>
         {!nativeShell && <p className="web-download-hint">The browser copies each file into site storage, so large videos stall. <a href={siteHref}>Download Videe for Mac, Windows, or iOS</a></p>}
       </section> : <section className="library-section" aria-label="Library">
         <div className="library-header">
