@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 if(process.platform !== 'darwin') throw new Error('Icon regeneration uses macOS sips/iconutil. Other platforms use the committed assets.');
 const source = resolve('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
 const output = resolve('public/icons');
@@ -25,6 +24,5 @@ try {
   let offset=header.length;
   images.forEach((png,i)=>{const entry=6+i*16;header[entry]=header[entry+1]=sizes[i]===256?0:sizes[i];header.writeUInt16LE(1,entry+4);header.writeUInt16LE(32,entry+6);header.writeUInt32LE(png.length,entry+8);header.writeUInt32LE(offset,entry+12);offset+=png.length;});
   writeFileSync(join(output,'Videe.ico'),Buffer.concat([header,...images]));
-  execFileSync('python3',[fileURLToPath(new URL('write-maskable-icons.py',import.meta.url))],{stdio:'inherit'});
   console.log('Generated macOS ICNS, Windows ICO, web and touch icons from the existing 1024px artwork.');
 } finally {rmSync(temp,{recursive:true,force:true});}

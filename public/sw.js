@@ -1,4 +1,4 @@
-const CACHE = 'videe-shell-v2';
+const CACHE = 'videe-shell-v3';
 const PRECACHE = [
   './',
   './index.html',
@@ -7,10 +7,7 @@ const PRECACHE = [
   './icons/icon-32.png',
   './icons/icon-180.png',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-192-maskable.png',
-  './icons/icon-512-maskable.png',
-  './icons/apple-touch-icon.png'
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
