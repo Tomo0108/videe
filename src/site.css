@@ -9,7 +9,9 @@
 .site-header { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 5; background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .site-header .site-wrap { display: flex; align-items: center; justify-content: space-between; width: min(1120px, calc(100% - 40px)); }
 .site-nav { display: flex; align-items: center; gap: 18px; font-size: var(--type-body); font-weight: 600; }
-.site-nav a { color: var(--ink); }
+.site-nav a { color: var(--ink); background: linear-gradient(currentColor, currentColor) 0 100% / 0 1.5px no-repeat; transition: background-size var(--duration-fast) var(--ease-out); }
+.site-nav a:hover { text-decoration: none; background-size: 100% 1.5px; }
+.install details[open] ol, .install details[open] p { animation: videe-view-in var(--duration-fade) var(--ease-out) both; }
 .hero { padding: 72px 0 36px; display: grid; grid-template-columns: minmax(0,1.1fr) minmax(280px,.9fr); gap: 48px; align-items: center; }
 .hero-copy h1 { font-size: clamp(2.4rem, 5vw, 4.1rem); line-height: 1.05; letter-spacing: -.03em; font-weight: 700; margin: 0 0 18px; }
 .hero-copy h1 > div { font: inherit; justify-content: flex-start; }

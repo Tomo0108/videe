@@ -104,7 +104,7 @@ const RichButton = React.forwardRef<HTMLButtonElement, RichButtonProps>(
       <Comp
         ref={ref}
         className={cn(
-          'cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 inset-shadow-2xs inset-shadow-white/25 bg-linear-to-b dark:bg-linear-to-t border border-zinc-950/35 shadow-md shadow-zinc-950/20 ring-0 transition-[filter] duration-200 hover:brightness-110 active:brightness-95 dark:border-0 dark:border-zinc-950/50',
+          'cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 inset-shadow-2xs inset-shadow-white/25 bg-linear-to-b dark:bg-linear-to-t border border-zinc-950/35 shadow-md shadow-zinc-950/20 ring-0 transition-[filter,transform,box-shadow] duration-200 hover:brightness-110 active:brightness-90 dark:border-0 dark:border-zinc-950/50',
           colorMap[color],
           sizeMap[size],
           textColor,

@@ -55,7 +55,7 @@ const FlowButton = React.forwardRef<HTMLButtonElement, FlowButtonProps>(
         <Comp
           ref={buttonRef}
           className={cn(
-            "relative z-0 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 pointer-events-auto cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap font-[550] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-neutral-100 dark:bg-muted/50 text-primary dark:hover:bg-transparent hover:bg-transparent",
+            "relative z-0 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 pointer-events-auto cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap font-[550] transition-[color,background-color,transform,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-neutral-100 dark:bg-muted/50 text-primary dark:hover:bg-transparent hover:bg-transparent",
             sizeMap[size],
             className,
           )}

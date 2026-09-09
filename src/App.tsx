@@ -46,6 +46,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 export default function App() {
   const [items, setItems] = useState<MediaItem[]>([]); const itemsRef = useRef(items); itemsRef.current = items;
   const [ready, setReady] = useState(false); const [view, setView] = useState<View>('all');
+  const [viewSlide, setViewSlide] = useState<'in' | 'fwd' | 'back'>('in');
   const [query, setQuery] = useState('');
   const [infoId, setInfoId] = useState<string|null>(null);
   const queue = useRef<string[]>([]); const visibleIds = useRef<string[]>([]);
@@ -157,6 +158,12 @@ export default function App() {
   const nativeShell = Boolean(window.videe) || Capacitor.isNativePlatform();
   const siteHref = import.meta.env.DEV ? '/site.html' : '/';
   const destinations = [{id:'all' as View, label:'All videos', icon:Film}, {id:'continue' as View,label:'Continue watching',icon:Clock3}, {id:'favorites' as View,label:'Favorites',icon:Heart}];
+  const viewOrder: View[] = ['all', 'continue', 'favorites'];
+  const selectView = (next: View) => {
+    if (next === view) return;
+    setViewSlide(viewOrder.indexOf(next) > viewOrder.indexOf(view) ? 'fwd' : 'back');
+    setView(next);
+  };
   const closePlayer = () => {
     if(conversion !== null) { notify('Cancel the conversion before returning to the library.'); return; }
     saveProgress(); videoRef.current?.pause(); ++openSequence.current;
@@ -193,7 +200,7 @@ export default function App() {
       </div>
     </header>
 
-    {!active && items.length > 0 && <aside className="library-sidebar"><p className="sidebar-label">Library</p><nav aria-label="Library navigation">{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-pressed={view===id} className={view===id?'selected':''} onClick={()=>setView(id)}><Icon size={18}/><span>{label}</span><Badge variant={view===id?'default':'outline'}>{items.filter(i=>id==='all'||(id==='favorites'?i.favorite:i.position>0&&i.position<i.duration-2)).length}</Badge></button>)}</nav><div className="sidebar-footer"><FolderOpen size={16}/><span>Local library<br/><small>{items.length} {items.length===1?'video':'videos'} · {sizeLabel(items.reduce((sum,i)=>sum+i.size,0))}</small></span></div></aside>}
+    {!active && items.length > 0 && <aside className="library-sidebar"><p className="sidebar-label">Library</p><nav aria-label="Library navigation" data-selected={view}><span className="nav-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-pressed={view===id} className={view===id?'selected':''} onClick={()=>selectView(id)}><Icon size={18}/><span>{label}</span><Badge variant={view===id?'default':'outline'}>{items.filter(i=>id==='all'||(id==='favorites'?i.favorite:i.position>0&&i.position<i.duration-2)).length}</Badge></button>)}</nav><div className="sidebar-footer"><FolderOpen size={16}/><span>Local library<br/><small>{items.length} {items.length===1?'video':'videos'} · {sizeLabel(items.reduce((sum,i)=>sum+i.size,0))}</small></span></div></aside>}
     <main>
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef}>
@@ -238,12 +245,12 @@ export default function App() {
       </section> : <section className="library-section" aria-label="Library">
         <div className="library-header">
           <div className="library-title"><p>YOUR COLLECTION</p><h1 key={view}>{prefs.motion ? <SlideUpText>{view==='all'?'Library':view==='continue'?'Continue watching':'Favorites'}</SlideUpText> : (view==='all'?'Library':view==='continue'?'Continue watching':'Favorites')}</h1></div>
-          <nav className="library-tabs" aria-label="Browse videos">{destinations.map(({id,label})=><button key={id} className={view===id?'selected':''} aria-pressed={view===id} onClick={()=>setView(id)}>{label}</button>)}</nav>
+          <nav className="library-tabs" aria-label="Browse videos" data-selected={view}><span className="tab-pill" aria-hidden="true"/>{destinations.map(({id,label})=><button key={id} className={view===id?'selected':''} aria-pressed={view===id} onClick={()=>selectView(id)}>{label}</button>)}</nav>
           <label className="search-box"><Search size={16}/><input aria-label="Search videos" placeholder="Search" value={query} onChange={e => setQuery(e.target.value)}/>{query && <button aria-label="Clear search" onClick={() => setQuery('')}><X size={15}/></button>}</label>
         </div>
         {!nativeShell && <p className="web-download-hint">Large files belong in the native app. <a href={siteHref}>Download Videe</a></p>}
-        <div className="library-toolbar"><span>{filtered.length} {filtered.length===1?'video':'videos'}</span><div><select aria-label="Sort by" value={prefs.sort} onChange={e=>setPrefs({...prefs,sort:e.target.value as Sort})}><option value="recent">Recently played</option><option value="name">Name</option><option value="duration">Longest first</option><option value="size">Largest first</option></select><div className="layout-switch"><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setPrefs({...prefs,layout:'grid'})}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setPrefs({...prefs,layout:'list'})}/></div></div></div>
-        {filtered.length > 0 ? <div key={view} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>{filtered.map(item => <article className="video-card" key={item.id}>
+        <div className="library-toolbar"><span>{filtered.length} {filtered.length===1?'video':'videos'}</span><div><select aria-label="Sort by" value={prefs.sort} onChange={e=>setPrefs({...prefs,sort:e.target.value as Sort})}><option value="recent">Recently played</option><option value="name">Name</option><option value="duration">Longest first</option><option value="size">Largest first</option></select><div className="layout-switch" data-layout={prefs.layout}><span className="layout-pill" aria-hidden="true"/><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setPrefs({...prefs,layout:'grid'})}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setPrefs({...prefs,layout:'list'})}/></div></div></div>
+        {filtered.length > 0 ? <div key={`${view}-${prefs.layout}`} data-slide={viewSlide} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>{filtered.map(item => <article className="video-card" key={item.id}>
           <button className="video-open" onClick={() => void openItem(item)} aria-label={`Play ${item.name}`}>
             <TiltCard className="video-tilt" enabled={prefs.motion && prefs.layout==='grid'} tiltLimit={7} scale={1.02} spotlight><span className="video-thumbnail">{item.thumbnail ? <img src={item.thumbnail} alt=""/> : <Film size={30} strokeWidth={1.2}/>}<span className="thumbnail-play"><Play size={23} fill="currentColor"/></span>{item.duration > 0 && <Badge className="duration-label">{timeLabel(item.duration)}</Badge>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100,item.position/item.duration*100)}%`}}/>}</span></TiltCard>
             <span className="video-title" title={item.name}>{item.name.replace(/\.[^.]+$/,'')}</span>
