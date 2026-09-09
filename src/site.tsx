@@ -1,14 +1,14 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Laptop, Monitor, Smartphone } from 'lucide-react';
+import { Download, Laptop, Monitor, Smartphone } from 'lucide-react';
 import { RELEASE_REPO, RELEASE_VERSION, RELEASES_API, RELEASES_PAGE, artifactNames, latestDownloadUrl } from './release.mjs';
 import { Badge } from './components/ui/badge';
 import { BlurReveal } from './components/ui/blur-reveal';
 import { FlowButton } from './components/ui/flow-button';
 import { GradientWaveText } from './components/ui/gradient-wave-text';
 import { HighlightedText } from './components/ui/highlighted-text';
-import { RichButton } from './components/ui/rich-button';
+import { LiquidButton } from './components/ui/liquid-button';
 import { ShimmerText } from './components/ui/shimmer-text';
 import { SlideUpText } from './components/ui/slide-up-text';
 import { TiltCard } from './components/ui/tilt-card';
@@ -97,7 +97,7 @@ function Site() {
             <BlurReveal as="p" delay={0.12} className="hero-lead">The Vercel web app has to copy every video into browser storage, so large files stall or fail. Videe for Mac, Windows, and iOS reads the file you already have.</BlurReveal>
             <p className="ja">ブラウザ版は動画をサイト内ストレージへ複製するため、大きなファイルには向きません。各OSアプリは元ファイルを直接開きます。クラウドにもアカウントにも送りません。</p>
             <div className="hero-actions">
-              <RichButton asChild size="lg" className="primary-button"><a href="#download">Download Videe</a></RichButton>
+              <LiquidButton href="#download" label="Download Videe" className="liquid-button-hero"><Download size={22} strokeWidth={1.8}/></LiquidButton>
               <FlowButton asChild className="secondary-button"><a href={playerHref}>Try a small clip in the browser</a></FlowButton>
             </div>
           </div>
@@ -110,12 +110,12 @@ function Site() {
             const file = files[card.id];
             const Icon = card.icon;
             return (
-              <TiltCard key={card.id} className={`download-card ${file.available ? '' : 'disabled'}`} tiltLimit={6} scale={1.02} spotlight>
+              <TiltCard key={card.id} className={`download-card overflow-visible ${file.available ? '' : 'disabled'}`} tiltLimit={6} scale={1.02} spotlight>
                 <Icon size={22} strokeWidth={1.7}/>
                 <h2>{card.title}</h2>
                 <p>{card.body}</p>
                 <Badge variant={file.available ? 'default' : 'outline'}>{file.available ? `Version ${version}${file.size ? ` · ${file.size}` : ''}` : 'Build in progress'}</Badge>
-                <RichButton asChild className="primary-button"><a href={file.available ? file.href : RELEASES_PAGE}>{file.available ? `Download ${card.title}` : 'View releases'}</a></RichButton>
+                <LiquidButton href={file.available ? file.href : RELEASES_PAGE} label={file.available ? `Download ${card.title}` : 'View releases'}><Download size={20} strokeWidth={1.8}/></LiquidButton>
                 <span className="meta">{card.note}</span>
               </TiltCard>
             );
@@ -139,7 +139,7 @@ function Site() {
         <section className="section site-wrap">
           <h2>Install notes</h2>
           <div className="install">
-            <details open>
+            <details>
               <summary>macOS</summary>
               <ol>
                 <li>Download the DMG and drag Videe to Applications, or open the app from the disk image.</li>

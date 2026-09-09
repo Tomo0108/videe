@@ -1,10 +1,10 @@
 .site { min-height: 100dvh; color: var(--ink); background: var(--base); background-image: var(--wash); }
 .site a { color: var(--accent); text-decoration: none; }
 .site a:hover { text-decoration: underline; }
-.site a.primary-button, .site a.secondary-button { text-decoration: none; }
+.site a.primary-button, .site a.secondary-button, .site a.liquid-button { text-decoration: none; color: var(--liquid-ink, var(--ink)); }
 .site a.primary-button { color: var(--on-accent); }
 .site a.secondary-button { color: inherit; }
-.site a.primary-button:hover, .site a.secondary-button:hover { text-decoration: none; }
+.site a.primary-button:hover, .site a.secondary-button:hover, .site a.liquid-button:hover { text-decoration: none; }
 .site-wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
 .site-header { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 5; background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .site-header .site-wrap { display: flex; align-items: center; justify-content: space-between; width: min(1120px, calc(100% - 40px)); }
@@ -17,7 +17,7 @@
 .hero-copy h1 > div { font: inherit; justify-content: flex-start; }
 .hero-kicker { color: var(--accent); font-size: var(--type-callout); font-weight: 700; letter-spacing: .14em; margin-bottom: 12px; }
 .hero-lead, .hero-copy p { color: var(--muted); font-size: var(--type-title3); line-height: 1.55; max-width: 38rem; }
-.download-card { overflow: hidden; }
+.download-card { overflow: visible; }
 .hero-copy .ja { margin-top: 12px; font-size: var(--type-body); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .hero-visual { border-radius: 28px; overflow: hidden; border: 1px solid var(--glass-edge); box-shadow: var(--shadow), 0 24px 80px #1a3a6a18; background: var(--surface); }
@@ -27,8 +27,8 @@
 .download-card h2 { font-size: var(--type-title2); line-height: var(--leading-title2); }
 .download-card p { color: var(--muted); font-size: var(--type-callout); line-height: 1.55; flex: 1; }
 .download-card .meta { color: var(--muted); font-size: var(--type-caption); }
-.download-card .primary-button, .download-card .secondary-button { width: 100%; }
-.download-card.disabled .primary-button { pointer-events: none; }
+.download-card .liquid-button { width: 100%; }
+.download-card.disabled .liquid-button { pointer-events: none; }
 .section { padding: 20px 0 64px; }
 .section h2 { font-size: var(--type-title1); line-height: var(--leading-title1); margin-bottom: 18px; }
 .why { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
@@ -52,6 +52,84 @@
   .hero, .downloads, .why, .shots { grid-template-columns: 1fr; }
   .hero { padding-top: 36px; gap: 28px; }
 }
+.liquid-button {
+  --liquid-ink: var(--ink);
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  overflow: hidden;
+  color: var(--liquid-ink);
+  background: oklch(1 0 0 / 0.18);
+  border: 1px solid oklch(1 0 0 / 0.42);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.72),
+    inset 0 -10px 18px oklch(0.55 0.06 250 / 0.08),
+    0 10px 28px oklch(0.2 0.04 260 / 0.14);
+  backdrop-filter: blur(28px) saturate(1.85);
+  -webkit-backdrop-filter: blur(28px) saturate(1.85);
+  transition: translate .32s var(--ease-spring), scale .28s var(--ease-spring), box-shadow .28s var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+}
+.liquid-button-fill, .liquid-button-caustic, .liquid-button-spec { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.liquid-button-fill {
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / 0.38), oklch(1 0 0 / 0.04) 42%, oklch(0.62 0.05 250 / 0.12));
+}
+.liquid-button-caustic {
+  inset: -55%;
+  background:
+    radial-gradient(ellipse 55% 40% at 18% 8%, oklch(1 0 0 / 0.7), transparent 52%),
+    radial-gradient(ellipse 45% 50% at 88% 92%, oklch(0.72 0.1 250 / 0.28), transparent 58%),
+    conic-gradient(from 210deg at 50% 40%, transparent 0 18%, oklch(1 0 0 / 0.16) 28%, transparent 42%);
+  animation: liquid-drift 9s ease-in-out infinite;
+}
+.liquid-button-spec {
+  background: linear-gradient(115deg, transparent 28%, oklch(1 0 0 / 0.5) 46%, transparent 62%);
+  background-size: 220% 100%;
+  background-position: 130% 0;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+.liquid-button-icon { position: relative; z-index: 1; display: grid; place-items: center; }
+.liquid-button:hover {
+  translate: 0 -2px;
+  border-color: oklch(1 0 0 / 0.62);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.85),
+    inset 0 -10px 20px oklch(0.55 0.08 250 / 0.12),
+    0 16px 36px oklch(0.22 0.05 260 / 0.18);
+}
+.liquid-button:hover .liquid-button-spec { opacity: 1; background-position: -30% 0; transition: background-position .7s var(--ease-out), opacity var(--duration-fast) var(--ease-out); }
+.liquid-button:active { scale: .96; translate: 0 1px; }
+.liquid-button-hero { width: 56px; min-width: 56px; height: 56px; padding: 0; }
+@keyframes liquid-drift {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  50% { translate: 6% -4%; rotate: 12deg; }
+}
+.dark .liquid-button, :root[data-theme=dark] .liquid-button {
+  --liquid-ink: oklch(0.98 0 0);
+  background: oklch(1 0 0 / 0.08);
+  border-color: oklch(1 0 0 / 0.22);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    inset 0 -12px 22px oklch(0.7 0.08 250 / 0.1),
+    0 12px 32px oklch(0 0 0 / 0.35);
+}
+.dark .liquid-button:hover, :root[data-theme=dark] .liquid-button:hover {
+  border-color: oklch(1 0 0 / 0.38);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.4),
+    inset 0 -12px 24px oklch(0.75 0.1 250 / 0.16),
+    0 18px 40px oklch(0 0 0 / 0.42);
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-button-caustic { animation: none; }
+}
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .site-header { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface); }
+  .liquid-button { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--surface); border-color: var(--line); }
 }
