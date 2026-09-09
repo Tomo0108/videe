@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+*.tsbuildinfo
+.DS_Store
+.vercel
+.env*.local
+ios/App/App/public/
+ios/App/Pods/
+tests/fixtures/*.mp4
+tests/fixtures/*.avi
