@@ -1,6 +1,10 @@
 .site { min-height: 100dvh; color: var(--ink); background: var(--base); background-image: var(--wash); }
 .site a { color: var(--accent); text-decoration: none; }
 .site a:hover { text-decoration: underline; }
+.site a.primary-button, .site a.secondary-button { text-decoration: none; }
+.site a.primary-button { color: var(--on-accent); }
+.site a.secondary-button { color: inherit; }
+.site a.primary-button:hover, .site a.secondary-button:hover { text-decoration: none; }
 .site-wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
 .site-header { height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 5; background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-bottom: 1px solid var(--line); }
 .site-header .site-wrap { display: flex; align-items: center; justify-content: space-between; width: min(1120px, calc(100% - 40px)); }
@@ -8,8 +12,10 @@
 .site-nav a { color: var(--ink); }
 .hero { padding: 72px 0 36px; display: grid; grid-template-columns: minmax(0,1.1fr) minmax(280px,.9fr); gap: 48px; align-items: center; }
 .hero-copy h1 { font-size: clamp(2.4rem, 5vw, 4.1rem); line-height: 1.05; letter-spacing: -.03em; font-weight: 700; margin: 0 0 18px; }
+.hero-copy h1 > div { font: inherit; justify-content: flex-start; }
 .hero-kicker { color: var(--accent); font-size: var(--type-callout); font-weight: 700; letter-spacing: .14em; margin-bottom: 12px; }
-.hero-copy p { color: var(--muted); font-size: var(--type-title3); line-height: 1.55; max-width: 38rem; }
+.hero-lead, .hero-copy p { color: var(--muted); font-size: var(--type-title3); line-height: 1.55; max-width: 38rem; }
+.download-card { overflow: hidden; }
 .hero-copy .ja { margin-top: 12px; font-size: var(--type-body); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .hero-visual { border-radius: 28px; overflow: hidden; border: 1px solid var(--glass-edge); box-shadow: var(--shadow), 0 24px 80px #1a3a6a18; background: var(--surface); }

@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, FolderOpen, Heart, LoaderCircle, Maximize, MoreHorizontal, Pause, PictureInPicture2, Play, Plus, RotateCcw, RotateCw, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, FolderOpen, Heart, Maximize, MoreHorizontal, Pause, PictureInPicture2, Play, Plus, RotateCcw, RotateCw, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon } from 'lucide-react';
 import { readLibrary, saveItem, removeItem, type MediaItem } from './store';
 import { Capacitor } from '@capacitor/core';
 import { isVideo, timeLabel, sizeLabel, toVtt, clampTime } from './media.mjs';
+import { Badge } from './components/ui/badge';
+import { BlurReveal } from './components/ui/blur-reveal';
+import { FlowButton } from './components/ui/flow-button';
+import { GradientWaveText } from './components/ui/gradient-wave-text';
+import { Kbd } from './components/ui/kbd';
+import { RichButton } from './components/ui/rich-button';
+import { ShimmerText } from './components/ui/shimmer-text';
+import { SlideUpText } from './components/ui/slide-up-text';
+import { Spinner } from './components/ui/spinner';
+import { TiltCard } from './components/ui/tilt-card';
 
 type View = 'all' | 'favorites' | 'continue';
 type Sort = 'recent' | 'name' | 'duration' | 'size';
@@ -154,8 +164,17 @@ export default function App() {
   };
   const closeMenu = (element: HTMLElement) => element.closest('details')?.removeAttribute('open');
   useEffect(() => {
-    document.documentElement.dataset.theme = prefs.theme;
-    document.documentElement.dataset.motion = prefs.motion ? 'on' : 'off';
+    const root = document.documentElement;
+    root.dataset.theme = prefs.theme;
+    root.dataset.motion = prefs.motion ? 'on' : 'off';
+    const syncDark = () => {
+      const dark = prefs.theme === 'dark' || (prefs.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      root.classList.toggle('dark', dark);
+    };
+    syncDark();
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    media.addEventListener('change', syncDark);
+    return () => media.removeEventListener('change', syncDark);
   }, [prefs.theme, prefs.motion]);
   return <div className={`app-shell ${active ? 'watching' : 'browsing'} ${window.videe?.platform === 'darwin' ? 'native-mac' : ''}`} 
     onDragEnter={e => { e.preventDefault(); if(e.dataTransfer.types.includes('Files')) { dragDepth.current++; setDragging(true); } }}
@@ -169,22 +188,22 @@ export default function App() {
       {active ? <div className="player-heading"><IconButton icon={ArrowLeft} label="Back to library" onClick={closePlayer}/><h1 title={active.name}>{active.name}</h1></div>
         : <div className="brand"><img src="./icon.png" alt="Videe"/><span>Videe</span></div>}
       <div className="header-actions">
-        {!active && items.length > 0 && <button className="primary-button" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy ? <LoaderCircle size={16} className="spin"/> : <Plus size={17}/>}Open video</button>}
+        {!active && items.length > 0 && <RichButton className="primary-button" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy ? <Spinner size="sm" className="spin"/> : <Plus size={17}/>}Open video</RichButton>}
         <IconButton icon={Settings2} label="Settings" onClick={() => setModal('settings')}/>
       </div>
     </header>
 
-    {!active && items.length > 0 && <aside className="library-sidebar"><p className="sidebar-label">Library</p><nav aria-label="Library navigation">{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-pressed={view===id} className={view===id?'selected':''} onClick={()=>setView(id)}><Icon size={18}/><span>{label}</span><small>{items.filter(i=>id==='all'||(id==='favorites'?i.favorite:i.position>0&&i.position<i.duration-2)).length}</small></button>)}</nav><div className="sidebar-footer"><FolderOpen size={16}/><span>Local library<br/><small>{items.length} {items.length===1?'video':'videos'} · {sizeLabel(items.reduce((sum,i)=>sum+i.size,0))}</small></span></div></aside>}
+    {!active && items.length > 0 && <aside className="library-sidebar"><p className="sidebar-label">Library</p><nav aria-label="Library navigation">{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-pressed={view===id} className={view===id?'selected':''} onClick={()=>setView(id)}><Icon size={18}/><span>{label}</span><Badge variant={view===id?'default':'outline'}>{items.filter(i=>id==='all'||(id==='favorites'?i.favorite:i.position>0&&i.position<i.duration-2)).length}</Badge></button>)}</nav><div className="sidebar-footer"><FolderOpen size={16}/><span>Local library<br/><small>{items.length} {items.length===1?'video':'videos'} · {sizeLabel(items.reduce((sum,i)=>sum+i.size,0))}</small></span></div></aside>}
     <main>
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef}>
           <div className="video-surface">
             {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && ab.b===null} onClick={togglePlay} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}setPosition(t);if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle&&<track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
-            {loading && !error && <div className="loading-overlay" role="status"><LoaderCircle size={24} className="spin"/><span className="sr-only">Loading</span></div>}
+            {loading && !error && <div className="loading-overlay" role="status"><Spinner size="lg" className="spin"/><span className="sr-only">Loading</span></div>}
             {error && <div className="player-error"><Film size={28}/><h2>Unable to play this video</h2>
               <p>{active.native ? 'Convert to a compatible format to start watching.' : 'Choose a format supported by this device.'}</p>
-              {active.native && (conversion !== null ? <><span className="conversion-status"><LoaderCircle size={16} className="spin"/>Converting · {timeLabel(conversion)}</span><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</button></>
-                : <button className="primary-button" onClick={() => void convert()}>Convert & play</button>)}
+              {active.native && (conversion !== null ? <><span className="conversion-status"><Spinner size="sm" className="spin"/>Converting · {timeLabel(conversion)}</span><FlowButton className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</FlowButton></>
+                : <RichButton className="primary-button" onClick={() => void convert()}>Convert & play</RichButton>)}
               <details className="error-details"><summary>Details</summary><p>{error}</p></details>
             </div>}
           </div>
@@ -210,13 +229,15 @@ export default function App() {
           </div>
         </div>
       </section> : items.length === 0 ? <section className="start-screen" aria-label="Open video">
-        <div className="welcome-icon"><img src="./icon.png" alt=""/></div><h1>Videe</h1>
-        <button className="primary-button open-button" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy || !ready ? <LoaderCircle size={17} className="spin"/> : null}Open video</button>
-        <p>or drop a video anywhere</p>
+        <div className="welcome-icon"><img src="./icon.png" alt=""/></div>
+        {prefs.motion ? <h1><GradientWaveText align="center" repeat paused={!prefs.motion}>Videe</GradientWaveText></h1> : <h1>Videe</h1>}
+        {prefs.motion ? <BlurReveal as="p" className="welcome-tagline" delay={0.15}>A quieter player for the films you already have.</BlurReveal> : <p className="welcome-tagline">A quieter player for the films you already have.</p>}
+        <RichButton className="primary-button open-button" size="lg" onClick={() => void pickFiles()} disabled={busy || !ready}>{busy || !ready ? <Spinner size="sm" className="spin"/> : null}Open video</RichButton>
+        {prefs.motion ? <ShimmerText className="drop-hint">or drop a video anywhere</ShimmerText> : <p>or drop a video anywhere</p>}
         {!nativeShell && <p className="web-download-hint">The browser copies each file into site storage, so large videos stall. <a href={siteHref}>Download Videe for Mac, Windows, or iOS</a></p>}
       </section> : <section className="library-section" aria-label="Library">
         <div className="library-header">
-          <div className="library-title"><p>YOUR COLLECTION</p><h1 key={view}>{view==='all'?'Library':view==='continue'?'Continue watching':'Favorites'}</h1></div>
+          <div className="library-title"><p>YOUR COLLECTION</p><h1 key={view}>{prefs.motion ? <SlideUpText>{view==='all'?'Library':view==='continue'?'Continue watching':'Favorites'}</SlideUpText> : (view==='all'?'Library':view==='continue'?'Continue watching':'Favorites')}</h1></div>
           <nav className="library-tabs" aria-label="Browse videos">{destinations.map(({id,label})=><button key={id} className={view===id?'selected':''} aria-pressed={view===id} onClick={()=>setView(id)}>{label}</button>)}</nav>
           <label className="search-box"><Search size={16}/><input aria-label="Search videos" placeholder="Search" value={query} onChange={e => setQuery(e.target.value)}/>{query && <button aria-label="Clear search" onClick={() => setQuery('')}><X size={15}/></button>}</label>
         </div>
@@ -224,7 +245,7 @@ export default function App() {
         <div className="library-toolbar"><span>{filtered.length} {filtered.length===1?'video':'videos'}</span><div><select aria-label="Sort by" value={prefs.sort} onChange={e=>setPrefs({...prefs,sort:e.target.value as Sort})}><option value="recent">Recently played</option><option value="name">Name</option><option value="duration">Longest first</option><option value="size">Largest first</option></select><div className="layout-switch"><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setPrefs({...prefs,layout:'grid'})}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setPrefs({...prefs,layout:'list'})}/></div></div></div>
         {filtered.length > 0 ? <div key={view} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>{filtered.map(item => <article className="video-card" key={item.id}>
           <button className="video-open" onClick={() => void openItem(item)} aria-label={`Play ${item.name}`}>
-            <span className="video-thumbnail">{item.thumbnail ? <img src={item.thumbnail} alt=""/> : <Film size={30} strokeWidth={1.2}/>}<span className="thumbnail-play"><Play size={23} fill="currentColor"/></span>{item.duration > 0 && <span className="duration-label">{timeLabel(item.duration)}</span>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100,item.position/item.duration*100)}%`}}/>}</span>
+            <TiltCard className="video-tilt" enabled={prefs.motion && prefs.layout==='grid'} tiltLimit={7} scale={1.02} spotlight><span className="video-thumbnail">{item.thumbnail ? <img src={item.thumbnail} alt=""/> : <Film size={30} strokeWidth={1.2}/>}<span className="thumbnail-play"><Play size={23} fill="currentColor"/></span>{item.duration > 0 && <Badge className="duration-label">{timeLabel(item.duration)}</Badge>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100,item.position/item.duration*100)}%`}}/>}</span></TiltCard>
             <span className="video-title" title={item.name}>{item.name.replace(/\.[^.]+$/,'')}</span>
             <span className="video-meta">{item.position>0&&item.position<item.duration-2 ? `${timeLabel(item.duration-item.position)} left · ` : ''}{sizeLabel(item.size)}{item.favorite && <Heart size={12} fill="currentColor"/>}</span>
           </button>
@@ -251,7 +272,7 @@ export default function App() {
       {active && <button className="setting-action" onClick={() => { setModal(null); void pictureInPicture(); }}><PictureInPicture2 size={17}/>Picture in Picture</button>}
       {!nativeShell && <a className="setting-action" href={siteHref}>Download Mac, Windows, or iOS app</a>}
       </section><div className="app-about"><img src="./icon.png" alt="Videe app icon"/><div><strong>Videe</strong><span>Version {appPackage.version}</span></div></div>
-      <details className="help-details"><summary>Shortcuts & help</summary><div className="shortcuts">{[['Play / pause','Space'],['Seek back / forward','← / →'],['Full screen','F'],['Mute','M']].map(([label,key]) => <div key={key}><span>{label}</span><kbd>{key}</kbd></div>)}</div><p>Format support depends on your device. The desktop app can convert unsupported videos.</p><p>Your library stays on this device. Clearing browser data removes the saved library.</p></details>
+      <details className="help-details"><summary>Shortcuts & help</summary><div className="shortcuts">{([['Play / pause',['space']],['Seek back / forward',['left','right']],['Full screen',['F']],['Mute',['M']]] as const).map(([label,keys]) => <div key={label}><span>{label}</span><Kbd keys={[...keys]}/></div>)}</div><p>Format support depends on your device. The desktop app can convert unsupported videos.</p><p>Your library stays on this device. Clearing browser data removes the saved library.</p></details>
     </Modal>}
     {modal === 'tools' && <Modal title="Playback tools" onClose={()=>setModal(null)}>
       <section className="settings-section"><h3>A–B loop</h3><div className="loop-tools">
@@ -263,10 +284,10 @@ export default function App() {
     </Modal>}
     {modal === 'subtitles' && <Modal title="Subtitles" onClose={() => setModal(null)}>
       {subtitle && <><label className="setting-row"><span>Show subtitles</span><input type="checkbox" role="switch" checked={captions} onChange={e => setCaptions(e.target.checked)}/></label><p className="subtitle-filename">{subtitle.name}</p></>}
-      <button className="secondary-button subtitle-import" onClick={() => subtitleRef.current?.click()}><FolderOpen size={17}/>{subtitle ? 'Replace subtitles' : 'Open subtitles'}</button>
+      <FlowButton className="secondary-button subtitle-import" onClick={() => subtitleRef.current?.click()}><FolderOpen size={17}/>{subtitle ? 'Replace subtitles' : 'Open subtitles'}</FlowButton>
       {!subtitle && <p className="subtle-text">SRT / WebVTT</p>}
     </Modal>}
     {info && <Modal title="Video info" onClose={()=>setInfoId(null)}><p className="delete-filename">{info.name}</p><dl className="info-list"><div><dt>Size</dt><dd>{sizeLabel(info.size)}</dd></div><div><dt>Duration</dt><dd>{info.duration?timeLabel(info.duration):'Not available'}</dd></div><div><dt>Playback position</dt><dd>{timeLabel(info.position)}</dd></div><div><dt>Added</dt><dd>{new Date(info.added).toLocaleDateString('en-US')}</dd></div><div><dt>Location</dt><dd>{info.native?'Original file':'Local library'}</dd></div></dl></Modal>}
-    {deleteId && <Modal title="Remove from library" onClose={() => setDeleteId(null)}><p className="delete-filename">{items.find(item => item.id === deleteId)?.name}</p><p className="subtle-text">Your original file will not be deleted.</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteId(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmDelete()}>Remove</button></div></Modal>}
+    {deleteId && <Modal title="Remove from library" onClose={() => setDeleteId(null)}><p className="delete-filename">{items.find(item => item.id === deleteId)?.name}</p><p className="subtle-text">Your original file will not be deleted.</p><div className="modal-actions"><FlowButton className="secondary-button" onClick={() => setDeleteId(null)}>Cancel</FlowButton><RichButton color="red" className="danger-button" onClick={() => void confirmDelete()}>Remove</RichButton></div></Modal>}
   </div>;
 }

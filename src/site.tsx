@@ -3,6 +3,17 @@ import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Laptop, Monitor, Smartphone } from 'lucide-react';
 import { RELEASE_REPO, RELEASE_VERSION, RELEASES_API, RELEASES_PAGE, artifactNames, latestDownloadUrl } from './release.mjs';
+import { Badge } from './components/ui/badge';
+import { BlurReveal } from './components/ui/blur-reveal';
+import { FlowButton } from './components/ui/flow-button';
+import { GradientWaveText } from './components/ui/gradient-wave-text';
+import { HighlightedText } from './components/ui/highlighted-text';
+import { RichButton } from './components/ui/rich-button';
+import { ShimmerText } from './components/ui/shimmer-text';
+import { SlideUpText } from './components/ui/slide-up-text';
+import { TiltCard } from './components/ui/tilt-card';
+import '@fontsource-variable/inter-tight';
+import './theme.css';
 import './style.css';
 import './site.css';
 
@@ -42,6 +53,16 @@ function Site() {
   const [files, setFiles] = useState<Record<Platform, Asset>>(FALLBACK);
   const [version, setVersion] = useState(RELEASE_VERSION);
   useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const sync = () => {
+      document.documentElement.classList.toggle('dark', media.matches);
+      document.documentElement.dataset.theme = 'system';
+    };
+    sync();
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+  useEffect(() => {
     void fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } }).then(async response => {
       if (!response.ok) return;
       const data = await response.json() as { tag_name?: string; assets?: { name: string; browser_download_url: string; size: number }[] };
@@ -71,35 +92,37 @@ function Site() {
       <main>
         <section className="hero site-wrap">
           <div className="hero-copy">
-            <p className="hero-kicker">LOCAL CINEMA</p>
-            <h1>Your films. On your machine.</h1>
-            <p>The Vercel web app has to copy every video into browser storage, so large files stall or fail. Videe for Mac, Windows, and iOS reads the file you already have.</p>
+            <ShimmerText className="hero-kicker">LOCAL CINEMA</ShimmerText>
+            <h1><GradientWaveText align="left" repeat paused={false}>Your films. On your machine.</GradientWaveText></h1>
+            <BlurReveal as="p" delay={0.12} className="hero-lead">The Vercel web app has to copy every video into browser storage, so large files stall or fail. Videe for Mac, Windows, and iOS reads the file you already have.</BlurReveal>
             <p className="ja">ブラウザ版は動画をサイト内ストレージへ複製するため、大きなファイルには向きません。各OSアプリは元ファイルを直接開きます。クラウドにもアカウントにも送りません。</p>
             <div className="hero-actions">
-              <a className="primary-button" href="#download">Download Videe</a>
-              <a className="secondary-button" href={playerHref}>Try a small clip in the browser</a>
+              <RichButton asChild size="lg" className="primary-button"><a href="#download">Download Videe</a></RichButton>
+              <FlowButton asChild className="secondary-button"><a href={playerHref}>Try a small clip in the browser</a></FlowButton>
             </div>
           </div>
-          <div className="hero-visual"><img src="./promo/library.png" alt="Videe library on desktop"/></div>
+          <TiltCard className="hero-visual" tiltLimit={8} scale={1.02} spotlight>
+            <img src="./promo/library.png" alt="Videe library on desktop"/>
+          </TiltCard>
         </section>
         <section id="download" className="site-wrap downloads" aria-label="Downloads">
           {cards.map(card => {
             const file = files[card.id];
             const Icon = card.icon;
             return (
-              <article className={`download-card ${file.available ? '' : 'disabled'}`} key={card.id}>
+              <TiltCard key={card.id} className={`download-card ${file.available ? '' : 'disabled'}`} tiltLimit={6} scale={1.02} spotlight>
                 <Icon size={22} strokeWidth={1.7}/>
                 <h2>{card.title}</h2>
                 <p>{card.body}</p>
-                <span className="meta">{file.available ? `Version ${version}${file.size ? ` · ${file.size}` : ''}` : 'Build in progress. Check GitHub Releases shortly.'}</span>
-                <a className="primary-button" href={file.available ? file.href : RELEASES_PAGE}>{file.available ? `Download ${card.title}` : 'View releases'}</a>
+                <Badge variant={file.available ? 'default' : 'outline'}>{file.available ? `Version ${version}${file.size ? ` · ${file.size}` : ''}` : 'Build in progress'}</Badge>
+                <RichButton asChild className="primary-button"><a href={file.available ? file.href : RELEASES_PAGE}>{file.available ? `Download ${card.title}` : 'View releases'}</a></RichButton>
                 <span className="meta">{card.note}</span>
-              </article>
+              </TiltCard>
             );
           })}
         </section>
         <section className="section site-wrap">
-          <h2>Why the apps exist</h2>
+          <h2><HighlightedText>Why the apps exist</HighlightedText></h2>
           <div className="why">
             <article><h3>No duplicate library</h3><p>Desktop Videe keeps a path to your file. Moving a 20 GB film does not mean uploading 20 GB into a website.</p></article>
             <article><h3>Stays on the device</h3><p>There is no Videe account and no cloud ingest. Playback, resume position, and favorites never leave the machine.</p></article>
@@ -107,7 +130,7 @@ function Site() {
           </div>
         </section>
         <section className="section site-wrap">
-          <h2>Look around</h2>
+          <h2><SlideUpText>Look around</SlideUpText></h2>
           <div className="shots">
             <figure><img src="./promo/player.png" alt="Videe player"/><figcaption>Transport sits under the picture. Queue, A–B loop, and subtitles stay one click away.</figcaption></figure>
             <figure><img src="./promo/start.png" alt="Videe start screen"/><figcaption>Open a file and watch. The first screen is one action.</figcaption></figure>
@@ -147,7 +170,7 @@ function Site() {
         <section className="site-wrap" style={{ paddingBottom: 72 }}>
           <div className="web-note">
             <p>Need a quick look on a tiny file? The browser player is still here. Anything you care about should go through the apps above.</p>
-            <a className="secondary-button" href={playerHref}>Open web player</a>
+            <FlowButton asChild className="secondary-button"><a href={playerHref}>Open web player</a></FlowButton>
           </div>
         </section>
       </main>
