@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron');
 const { join } = require('node:path');
+const { existsSync, readFileSync } = require('node:fs');
 const { mediaResponse } = require('./media-response.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
@@ -26,7 +27,17 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
-  if (process.argv.includes('--dev')) win.loadURL('http://127.0.0.1:5173'); else win.loadFile(join(__dirname, '../dist/index.html'));
+  if (process.argv.includes('--dev')) win.loadURL('http://127.0.0.1:5173'); else win.loadFile(playerHtml());
+}
+function playerHtml() {
+  const dist = join(__dirname, '../dist');
+  for (const name of ['app.html', 'index.html']) {
+    const file = join(dist, name);
+    if (!existsSync(file)) continue;
+    const html = readFileSync(file, 'utf8');
+    if (html.includes('/src/main.tsx') || /assets\/main-/.test(html)) return file;
+  }
+  return join(dist, 'index.html');
 }
 app.whenReady().then(async () => {
   if (process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../dist/icon.png'));

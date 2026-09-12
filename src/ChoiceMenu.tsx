@@ -1,0 +1,7 @@
+import {useEffect,useRef,type ReactNode} from 'react';
+import {Check,ChevronDown} from 'lucide-react';
+export function ChoiceMenu({label,trigger,value,options,onChange,disabled=false}:{label:string;trigger:ReactNode;value:string;options:{value:string;label:string;icon?:ReactNode}[];onChange:(value:string)=>void;disabled?:boolean}){
+ const ref=useRef<HTMLDetailsElement>(null);
+ useEffect(()=>{const close=(e:PointerEvent)=>{if(!ref.current?.contains(e.target as Node))ref.current?.removeAttribute('open');};const key=(e:KeyboardEvent)=>{if(e.key==='Escape'&&ref.current?.open){ref.current.removeAttribute('open');ref.current.querySelector('summary')?.focus();}};document.addEventListener('pointerdown',close);document.addEventListener('keydown',key);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',key);};},[]);
+ return <details ref={ref} className="choice-menu"><summary aria-label={label} title={label} aria-disabled={disabled} onClick={e=>{if(disabled)e.preventDefault();}}>{trigger}<ChevronDown size={12} aria-hidden="true"/></summary><div className="choice-options" role="group" aria-label={label}>{options.map(option=><button key={option.value} aria-pressed={value===option.value} disabled={disabled} onClick={()=>{onChange(option.value);ref.current?.removeAttribute('open');ref.current?.querySelector('summary')?.focus();}}>{option.icon}<span>{option.label}</span>{value===option.value&&<Check size={15}/>}</button>)}</div></details>;
+}

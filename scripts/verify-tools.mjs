@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 const browser=await chromium.launch({channel:'chromium',headless:true});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
+const cdp=await page.context().newCDPSession(page);await cdp.send('Media.enable');const mediaEvents=[];cdp.on('Media.playerEventsAdded',e=>mediaEvents.push(e));
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
@@ -20,14 +21,14 @@ try {
  await page.getByRole('button',{name:/Set B/}).click();
  await page.getByRole('button',{name:'Close',exact:true}).click();
  await dialogGone();
- await page.locator('video').evaluate(v=>v.play());
+ await page.getByRole('button',{name:'Play',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('video').currentTime>3.3);
  await page.waitForFunction(()=>{const v=document.querySelector('video');return v.currentTime>=2&&v.currentTime<2.8&&!v.paused;});
  await page.getByRole('button',{name:'Playback tools',exact:true}).click();
  await page.getByRole('button',{name:'Clear loop',exact:true}).click();
  await page.getByRole('button',{name:'Close',exact:true}).click();
  await dialogGone();
- await page.waitForFunction(()=>document.querySelector('video').currentTime>4.2);
+ await page.waitForFunction(()=>document.querySelector('video').currentTime>4.2,null,{timeout:7000});
  await page.getByRole('button',{name:'Playback tools',exact:true}).click();
  await page.getByRole('button',{name:'Play queue item Second.mp4',exact:true}).click();
  await page.getByRole('heading',{name:'Second.mp4',exact:true}).waitFor();
@@ -44,4 +45,4 @@ try {
  assert.equal(await page.locator('.video-thumbnail img').first().evaluate(el=>getComputedStyle(el).objectFit),'contain');
  assert.deepEqual(errors,[]);
  console.log('PASS: original icon, no spotlight, uncropped thumbnails, actual A-B repeat, invalid range, clear loop, queue navigation, loop reset, mobile tools.');
-}finally{await browser.close();}
+}catch(e){console.log(JSON.stringify(mediaEvents).slice(-8000));console.log(await page.locator('body').innerText());console.log(await page.locator('video').evaluate(v=>({time:v.currentTime,paused:v.paused,ended:v.ended,loop:v.loop})));throw e;}finally{await browser.close();}

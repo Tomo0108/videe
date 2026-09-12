@@ -11,13 +11,13 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "desktop": "npm run build && electron .",
+    "desktop": "npm run build && node scripts/ensure-player-index.mjs && electron .",
     "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
-    "package:mac": "node scripts/check-platform.mjs darwin && npm run build && electron-builder --mac --dir --publish never",
-    "package:mac:dmg": "node scripts/check-platform.mjs darwin && npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never",
-    "package:win": "node scripts/check-platform.mjs win32 && npm run build && electron-builder --win nsis --publish never",
+    "package:mac": "node scripts/check-platform.mjs darwin && npm run build && node scripts/ensure-player-index.mjs && electron-builder --mac --dir --publish never",
+    "package:mac:dmg": "node scripts/check-platform.mjs darwin && npm run build && node scripts/ensure-player-index.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never",
+    "package:win": "node scripts/check-platform.mjs win32 && npm run build && node scripts/ensure-player-index.mjs && electron-builder --win nsis --publish never",
     "package:ios": "node scripts/package-ios.mjs",
-    "ios:sync": "npm run build && cap sync ios",
+    "ios:sync": "npm run build && node scripts/ensure-player-index.mjs && cap sync ios",
     "ios:open": "cap open ios",
     "test": "node --test tests/*.test.mjs",
     "test:fixtures": "node scripts/create-fixtures.mjs",
@@ -28,7 +28,10 @@
     "icons:build": "node scripts/build-icons.mjs",
     "test:playback": "node scripts/verify-playback.mjs",
     "test:ui": "node scripts/verify-tahoe.mjs",
-    "test:tools": "node scripts/verify-tools.mjs"
+    "test:tools": "node scripts/verify-tools.mjs",
+    "test:storage": "node scripts/verify-storage.mjs",
+    "test:organization": "node scripts/verify-organization.mjs",
+    "test:collections": "node scripts/verify-collections.mjs"
   },
   "build": {
     "appId": "app.videe.player",
@@ -73,18 +76,12 @@
   "dependencies": {
     "@capacitor/core": "^8.5.1",
     "@capacitor/ios": "^8.5.1",
+    "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/inter-tight": "^5.3.0",
-    "@radix-ui/react-slot": "^1.3.3",
-    "@tailwindcss/vite": "^4.3.3",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "ffmpeg-static": "^5.3.0",
     "lucide-react": "^1.43.0",
-    "motion": "^13.2.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "tailwind-merge": "^3.6.0",
-    "tailwindcss": "^4.3.3"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.1",

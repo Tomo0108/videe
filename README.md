@@ -174,3 +174,26 @@ npm run test:desktop
 - Resume: 各動画のメニューから保存位置へ復帰。
 
 検証: `npm run test:tools`、既存のUI・ライブラリ・リピートテスト。
+
+### Library storage and interface refinement
+
+- IndexedDB v2 separates video bytes from library metadata. Existing libraries migrate transactionally, preserving favorites and resume positions. Videos load on demand; progress updates only write metadata. Removing a library item also removes its stored media copy.
+- The app uses system typography, a continuous sidebar, static uncropped previews and restrained controls. Original app icons remain unchanged. System Reduce Motion takes precedence over the app animation preference.
+- `npm run test:storage` verifies legacy migration, resumed playback after reload, metadata-only writes and media deletion in Chromium.
+
+### Icon export
+
+The original opaque 1024px artwork remains the source for iOS and Apple touch icons, whose corners are masked by the OS. Legacy desktop ICNS/ICO and web `any` icons use an explicit rounded-square alpha mask, exported by `scripts/round-icon.swift`. No artwork is regenerated. `npm run icons:build` produces all sizes and checks corner/center alpha before packaging. The master uses a 32px inset and 210px corner radius; these are app-specific choices, not a claim to reproduce Icon Composer’s exact system curve. See [Apple App Icons](https://developer.apple.com/design/human-interface-guidelines/app-icons).
+
+### Library organization and locks
+
+- **Folders:** Create, rename and remove folders in **Organize**. Select cards and use **Destination → Add selected** to move them. Each video belongs to at most one folder; removing a folder keeps its videos. **Unfiled** shows videos outside folders.
+- **Playlists:** Create a playlist, add selected videos, reorder with the up/down buttons, and choose **Play playlist**. The stored order becomes the playback queue; playlist order overrides library sorting.
+- **Rename:** Select videos, enter a prefix and starting number, inspect **Preview names**, then **Apply rename**. The batch is committed atomically. **Auto rename on import** assigns persistent `Video 001` numbering. Extensions and original filenames are retained. These are library display names: source files and filesystem folders are not changed.
+- **Thumbnails:** Compatible unplayed videos are scanned sequentially while browsing. Preview generation pauses when a video is opened. Unsupported sources retain a placeholder; normal playback can supply a preview later.
+- **A–B loop:** Playback tools supports current-position markers and explicit start/end seconds, validates the range, and resets points when switching videos. Timing follows browser media events and is not frame-accurate.
+- **Control lock:** The player padlock blocks on-screen controls, taps and app shortcuts without stopping playback. Choose **Unlock controls → Confirm unlock** to restore controls. OS media controls remain under system control.
+- **Password lock:** Settings supports setup, change and removal with current-password verification. The library locks on launch and with **Lock now**. Password verification uses Web Crypto PBKDF2-SHA-256, a random 16-byte salt and 600,000 iterations; plaintext passwords are not stored. This is an app privacy screen, not encrypted media storage or protection against someone with filesystem/developer-tools access. There is no password recovery. Implementation reference: [MDN deriveBits](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveBits).
+- `npm run test:organization` covers persisted folders, playlist ordering, renaming, previews, both locks and mobile layout with isolated test data.
+
+Folder and playlist creation are available directly from the folder-plus and list-plus buttons, including before any video is imported. Saved collections appear as named icon buttons. Open a collection and choose **Add videos** to select from the entire library, even when that collection is empty. New imports are added to the currently open collection. Playback tools now contains an explicit **Lock screen** action in addition to the player padlock; **Screen locked** confirms the state. `npm run test:collections` checks these entry points end to end.

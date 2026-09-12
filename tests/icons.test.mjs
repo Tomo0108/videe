@@ -6,6 +6,10 @@ function pngSize(buffer){assert.equal(buffer.subarray(1,4).toString(),'PNG');ret
 test('icons are square and consistent across web and iOS',()=>{
   assert.deepEqual(pngSize(read('public/icon.png')),[1024,1024]);
   assert.deepEqual(read('public/icon.png'),read('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'));
+  const rounded=read('public/icons/icon-rounded.png');
+  assert.deepEqual(pngSize(rounded),[1024,1024]);
+  assert.equal(rounded[25],6,'desktop master includes RGBA transparency');
+  assert.notDeepEqual(rounded,read('public/icon.png'));
   for(const size of [32,180,192,512]) assert.deepEqual(pngSize(read(`public/icons/icon-${size}.png`)),[size,size]);
   const manifest=JSON.parse(read('public/manifest.webmanifest'));
   assert.equal(manifest.name,'Videe');
@@ -21,7 +25,7 @@ test('icons are square and consistent across web and iOS',()=>{
   assert.match(html,/icons\/icon-180\.png/);
   assert.match(html,/apple-mobile-web-app-capable/);
   assert.doesNotMatch(html,/personal cinema|Just press play|apple-touch-icon\.png/);
-  assert.match(read('public/sw.js').toString(),/videe-shell-v6/);
+  assert.match(read('public/sw.js').toString(),/videe-shell-v7/);
 });
 test('native package configuration uses valid multi-resolution icon containers',()=>{
   const config=JSON.parse(read('package.json')).build;

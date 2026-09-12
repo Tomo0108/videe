@@ -68,6 +68,10 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Videe opens videos you choose from your library.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Videe opens video files stored on this device.</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>

@@ -39,8 +39,8 @@ try {
   await cdp.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-transparency',value:'reduce'},{name:'prefers-reduced-motion',value:'reduce'}]});
   assert.equal(await page.locator('.library-sidebar').evaluate(el=>getComputedStyle(el).backdropFilter),'none');
   assert.ok(await page.locator('.library-sidebar').evaluate(el=>!getComputedStyle(el).backgroundColor.startsWith('rgba')));
-  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--duration-sheet').trim()),'.2s');
-  assert.notEqual(await page.locator('.video-card').first().evaluate(el=>getComputedStyle(el).animationName),'none');
+  await page.waitForFunction(()=>document.documentElement.dataset.motion==='off');
+  assert.equal(await page.locator('.video-card').first().evaluate(el=>getComputedStyle(el).animationName),'none');
   await cdp.send('Emulation.setEmulatedMedia',{features:[]});
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   await dialogReady();
