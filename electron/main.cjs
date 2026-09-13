@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, protocol } = require('electron');
 const { basename, isAbsolute, join } = require('node:path');
 const { existsSync, readFileSync } = require('node:fs');
 const { mediaResponse } = require('./media-response.cjs');
-const { collectVideoPaths } = require('./folder.cjs');
+const { collectVideoPaths, folderGroupName } = require('./folder.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
@@ -102,7 +102,14 @@ app.whenReady().then(async () => {
     const records = await importPaths([dir]);
     let name = '';
     try { if ((await fs.stat(dir)).isDirectory()) name = basename(dir); } catch { /* Missing paths are skipped by importPaths. */ }
-    return { name, records };
+    const grouped = new Map();
+    for (const record of records) {
+      const filePath = registry[record.id]?.path;
+      const folder = filePath ? folderGroupName(dir, filePath) : name;
+      if (!grouped.has(folder)) grouped.set(folder, []);
+      grouped.get(folder).push(record.id);
+    }
+    return { name, records, folders: [...grouped].map(([folder, ids]) => ({ name: folder, ids })) };
   });
   register('import-paths', importPaths);
   register('get-source', async id => { const entry = registry[id]; if (!entry) throw new Error('File not found. Please add it again.'); await fs.access(entry.converted || entry.path); return `videe://media/${id}`; });

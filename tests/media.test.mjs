@@ -48,4 +48,5 @@ test('browser folder walk collects nested videos and skips notes', async () => {
   };
   const files = await filesFromDirectory(handle);
   assert.deepEqual(files.map(file => file.name), ['Clip.MP4']);
+  assert.equal(files[0].webkitRelativePath, 'nested/Clip.MP4');
 });

@@ -24,8 +24,8 @@ test('GitHub releases become AltStore versions with sha256', () => {
   assert.equal(versions[0].size, 10977968);
 });
 
-test('0.1.4 release notes describe the library list', () => {
-  assert.match(versionNote('0.1.4'), /sortable library lists/i);
-  assert.match(githubReleaseNotes('0.1.4'), /sortable library lists/i);
-  assert.match(githubReleaseNotes('0.1.4'), /AltStore or Sideloadly/);
+test('0.1.5 release notes describe library cleanup', () => {
+  assert.match(versionNote('0.1.5'), /bulk library removal/i);
+  assert.match(githubReleaseNotes('0.1.5'), /nested folder import/i);
+  assert.match(githubReleaseNotes('0.1.5'), /AltStore or Sideloadly/);
 });

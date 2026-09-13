@@ -1,5 +1,5 @@
 export const RELEASE_REPO = 'Tomo0108/videe';
-export const RELEASE_VERSION = '0.1.4';
+export const RELEASE_VERSION = '0.1.5';
 /** @param {string} [version] */
 export function artifactNames(version = RELEASE_VERSION) {
   return {

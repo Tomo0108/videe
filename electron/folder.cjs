@@ -1,5 +1,5 @@
 const { readdir } = require('node:fs/promises');
-const { join, extname } = require('node:path');
+const { basename, extname, join, relative } = require('node:path');
 
 const VIDEO_EXT = new Set(['mp4','m4v','mov','webm','mkv','avi','wmv','flv','mpeg','mpg','m2ts','mts','ts','3gp','ogv','vob','mxf','hevc','av1']);
 
@@ -22,4 +22,10 @@ async function collectVideoPaths(root, { maxFiles = 1000, maxDepth = 8 } = {}) {
   return acc;
 }
 
-module.exports = { collectVideoPaths, VIDEO_EXT };
+function folderGroupName(root, filePath) {
+  const parts = relative(root, filePath).split(/[/\\]/).filter(Boolean);
+  if (parts.length <= 1) return basename(root);
+  return parts[0];
+}
+
+module.exports = { collectVideoPaths, VIDEO_EXT, folderGroupName };

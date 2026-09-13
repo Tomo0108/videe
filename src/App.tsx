@@ -9,7 +9,7 @@ import { readLibrary, readMediaBlob, renameItems, saveItem, removeItem, type Med
 import { Capacitor } from '@capacitor/core';
 import { isVideo, timeLabel, sizeLabel, toVtt, clampTime, clipLoop, keepSegments } from './media.mjs';
 import {Organization,readCollections,importedName,type Collection} from './organization';
-import {placeInFolder,sourceFolderName,moveToFolder} from './collections.mjs';
+import {placeInFolders,sourceFolderGroups,sourceFolderName,moveToFolder} from './collections.mjs';
 import {SecuritySettings} from './security';
 import {useThumbnails,captureFrame,THUMBNAIL_VERSION} from './thumbnails';
 import { compareMedia, DEFAULT_DIR, nextSortPref, readFolderSort, sortKey, writeFolderSort, type LibrarySort } from './library-sort.mjs';
@@ -40,7 +40,7 @@ export default function App() {
   const [items, setItems] = useState<MediaItem[]>([]); const itemsRef = useRef(items); itemsRef.current = items;
   const [ready, setReady] = useState(false); const [view, setView] = useState<View>('all');
   const [viewSlide, setViewSlide] = useState<'in' | 'fwd' | 'back' | 'grid' | 'list'>('in');
-  const [collections,setCollections]=useState(readCollections);
+  const [collections,setCollections]=useState(readCollections); const collectionsRef = useRef(collections); collectionsRef.current = collections;
   const [scope,setScope]=useState('');
   const [folderSort,setFolderSort]=useState(readFolderSort);
   const [selected,setSelected]=useState<string[]>([]);
@@ -54,7 +54,7 @@ export default function App() {
   const queue = useRef<string[]>([]); const visibleIds = useRef<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null); const [source, setSource] = useState(''); const [playing,setPlaying] = useState(false); const [position,setPosition] = useState(0); const [duration,setDuration] = useState(0);
   const [muted,setMuted] = useState(false); const [error,setError] = useState(''); const [loading,setLoading] = useState(false); const [busy,setBusy] = useState(false); const [conversion,setConversion] = useState<number | null>(null);
-  const [prefs,setPrefs] = useState<Preferences>(getPreferences); const [modal,setModal] = useState<'settings'|'subtitles'|'cut'|null>(null); const [deleteId,setDeleteId] = useState<string|null>(null); const [toast,setToast] = useState(''); const [dragging,setDragging] = useState(false);
+  const [prefs,setPrefs] = useState<Preferences>(getPreferences); const [modal,setModal] = useState<'settings'|'subtitles'|'cut'|null>(null); const [deleteIds,setDeleteIds] = useState<string[]|null>(null); const [toast,setToast] = useState(''); const [dragging,setDragging] = useState(false);
   const [ab, setAb] = useState<{a:number|null;b:number|null}>({a:null,b:null});
   const [chrome, setChrome] = useState(true);
   const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
@@ -105,9 +105,10 @@ export default function App() {
     if(persist) void saveItem(updated).catch(() => notify('Changes could not be saved and may be lost when you close the app.'));
   }, [notify]);
   useThumbnails(items,!!activeId||busy,updateItem);
-  const saveCollections=(next:Collection[])=>{try{localStorage.setItem('videe-collections',JSON.stringify(next));setCollections(next);return true;}catch{notify('Could not save collections.');return false;}};
+  const saveCollections=(next:Collection[])=>{try{localStorage.setItem('videe-collections',JSON.stringify(next));collectionsRef.current=next;setCollections(next);return true;}catch{notify('Could not save collections.');return false;}};
   const fileIntoScope=(ids:string[])=>{if(!collections.some(c=>c.id===scope)||!ids.length)return;saveCollections(collections.map(c=>c.id===scope?{...c,ids:[...new Set([...c.ids,...ids])]}:c));};
-  const fileIntoFolder=(name:string,ids:string[])=>{const {collections:next,folderId}=placeInFolder(collections,name,ids);if(!folderId){fileIntoScope(ids);return false;}if(saveCollections(next)){setViewSlide('in');setScope(folderId);setView('all');setQuery('');return true;}return false;};
+  const fileIntoFolders=(groups:{name:string;ids:string[]}[],rootName='')=>{const ids=[...new Set(groups.flatMap(group=>group.ids))];if(!groups.length){fileIntoScope(ids);return false;}const {collections:next,folderId}=placeInFolders(collections,groups,rootName);if(!folderId){fileIntoScope(ids);return false;}if(saveCollections(next)){setViewSlide('in');setScope(folderId);setView('all');setQuery('');return true;}return false;};
+  const fileIntoFolder=(name:string,ids:string[])=>fileIntoFolders(name&&ids.length?[{name,ids}]:[],name);
   const relocate=(ids:string[],dest:string)=>{if(!ids.length)return;if(saveCollections(moveToFolder(collections,ids,dest)))setSelected(current=>current.filter(id=>!ids.includes(id)));};
   const batchRename=async(names:Map<string,string>)=>{await renameItems(names);const next=itemsRef.current.map(i=>names.has(i.id)?{...i,originalName:i.originalName||i.name,name:names.get(i.id)!}:i);itemsRef.current=next;setItems(next);};
   const saveProgress = useCallback(() => { const video = videoRef.current; if(activeRef.current && video && Number.isFinite(video.currentTime)) updateItem(activeRef.current, {position: video.ended ? 0 : video.currentTime}); }, [updateItem]);
@@ -159,18 +160,30 @@ export default function App() {
   const importFiles = async (files: File[]) => {
     if(busy || !ready || controlsLocked) return;
     const folderName = sourceFolderName(files);
-    if(window.videe) { setBusy(true); try { await addNativeRecords(await window.videe.importFiles(files), folderName); } catch { notify('Could not add videos. Try opening a folder.'); } finally { setBusy(false); } return; }
-    const importedIds:string[]=[]; const folderIds:string[]=[]; setBusy(true); let first: MediaItem | undefined; let count = 0; let transient = false; let invalid = 0;
+    const groups = sourceFolderGroups(files);
+    const idsFor = (fileList: File[], records: {id:string;name:string;size:number}[]) => fileList.map(file => records.find(record => record.name === file.name && record.size === file.size)?.id).filter((id): id is string => !!id);
+    if(window.videe) {
+      setBusy(true);
+      try {
+        const records = await window.videe.importFiles(files);
+        await addNativeRecords(records, folderName, groups.map(group => ({ name: group.name, ids: idsFor(group.files, records) })));
+      } catch { notify('Could not add videos. Try opening a folder.'); }
+      finally { setBusy(false); }
+      return;
+    }
+    const importedIds:string[]=[]; const folderIds:string[]=[]; const imported=new Map<File,string>(); setBusy(true); let first: MediaItem | undefined; let count = 0; let transient = false; let invalid = 0;
     try {
       for(const file of files) {
         if(!isVideo(file.name,file.type)) { invalid++; continue; }
         const existing = itemsRef.current.find(i => !i.native && (i.originalName||i.name) === file.name && i.size === file.size);
-        if(existing) { first ||= existing; folderIds.push(existing.id); continue; }
+        if(existing) { first ||= existing; folderIds.push(existing.id); imported.set(file, existing.id); continue; }
         const item: MediaItem = { id: crypto.randomUUID(), name:importedName(file.name), originalName:file.name, size:file.size, type:file.type, blob:file, added:Date.now(), duration:0, position:0, favorite:false, lastPlayed:0 };
         try { await saveItem(item); } catch { transient = true; }
-        const next = [...itemsRef.current,item]; itemsRef.current = next; setItems(next); first ||= item; count++; importedIds.push(item.id); folderIds.push(item.id);
+        const next = [...itemsRef.current,item]; itemsRef.current = next; setItems(next); first ||= item; count++; importedIds.push(item.id); folderIds.push(item.id); imported.set(file, item.id);
       }
-      if(folderName) fileIntoFolder(folderName, folderIds);
+      const named = groups.map(group => ({ name: group.name, ids: group.files.map(file => imported.get(file)).filter((id): id is string => !!id) })).filter(group => group.ids.length);
+      if(named.length) fileIntoFolders(named, folderName);
+      else if(folderName) fileIntoFolder(folderName, folderIds);
       else fileIntoScope(importedIds);
       if(transient) notify('Storage is full. Some videos are available for this session only.');
       else if(invalid) notify(`Skipped ${invalid} non-video files.`);
@@ -178,11 +191,13 @@ export default function App() {
       if(first && !activeRef.current && !folderName) { visibleIds.current = itemsRef.current.map(i=>i.id); await openItem(first); }
     } finally { setBusy(false); }
   };
-  const addNativeRecords = async (picked: MediaItem[], folderName = '') => {
+  const addNativeRecords = async (picked: MediaItem[], folderName = '', folders: {name:string;ids:string[]}[] = []) => {
     const fresh = picked.filter(p => !itemsRef.current.some(i => i.id === p.id)).map(p=>({...p,originalName:p.name,name:importedName(p.name)}));
     for(const item of fresh) await saveItem(item);
     const next = [...itemsRef.current,...fresh]; itemsRef.current=next; setItems(next);
-    if(folderName) fileIntoFolder(folderName, picked.map(item=>item.id));
+    const named = folders.filter(folder => folder.name && folder.ids.length);
+    if(named.length) fileIntoFolders(named, folderName);
+    else if(folderName) fileIntoFolder(folderName, picked.map(item=>item.id));
     else fileIntoScope(fresh.map(item=>item.id));
     if(picked[0] && !activeRef.current && !folderName) { visibleIds.current = next.map(i=>i.id); await openItem(next.find(i=>i.id===picked[0].id)!); }
   };
@@ -194,7 +209,7 @@ export default function App() {
         const picked = await window.videe.pickFolder();
         if(picked === null) return;
         if(!picked.records.length) { notify('No videos in this folder.'); return; }
-        await addNativeRecords(picked.records, picked.name);
+        await addNativeRecords(picked.records, picked.name, picked.folders || []);
       } catch { notify('Could not open this folder.'); }
       finally { setBusy(false); }
       return;
@@ -238,7 +253,7 @@ export default function App() {
       if (!activeRef.current || e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === 'Escape' && document.fullscreenElement) { e.preventDefault(); void document.exitFullscreen(); return; }
       if (controlsLocked || e.defaultPrevented || e.shiftKey) return;
-      if ((e.target as HTMLElement).closest('input,select,textarea,button,dialog,summary,a,[contenteditable]:not([contenteditable="false"]),[role="button"]') || modal || deleteId || infoId) return;
+      if ((e.target as HTMLElement).closest('input,select,textarea,button,dialog,summary,a,[contenteditable]:not([contenteditable="false"]),[role="button"]') || modal || deleteIds || infoId) return;
       const video = videoRef.current;
       const time = video?.currentTime || 0;
       const length = video && Number.isFinite(video.duration) ? video.duration : 0;
@@ -257,7 +272,7 @@ export default function App() {
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [togglePlay, seek, fullscreen, modal, deleteId, infoId, controlsLocked, subtitle, embeddedTracks.length, revealChrome]);
+  }, [togglePlay, seek, fullscreen, modal, deleteIds, infoId, controlsLocked, subtitle, embeddedTracks.length, revealChrome]);
   useEffect(() => {
     if (!active || !('mediaSession' in navigator)) return;
     const session = navigator.mediaSession;
@@ -366,7 +381,36 @@ export default function App() {
   };
   const importSubtitle = async (file?: File) => { if(!file) return; try { if(file.size > 5*1024*1024) throw new Error('Choose a subtitle file smaller than 5 MB.'); const text = toVtt(await file.text()); setSubtitle({url:URL.createObjectURL(new Blob([text],{type:'text/vtt'})),name:file.name}); setCaptions(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not load subtitles.'); } };
   const convert = async () => { if(!active?.native || !window.videe) return; setJobKind('convert'); setConversion(0); try { const src = await window.videe.convertVideo(active.id); setError(''); setSource(src); setLoading(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not convert this video.'); } finally { setConversion(null); } };
-  const confirmDelete = async () => { if(!deleteId) return; const item = itemsRef.current.find(i=>i.id===deleteId); try { if(item?.native) await window.videe?.forgetVideo(deleteId); await removeItem(deleteId); if(activeId===deleteId) { ++openSequence.current; videoRef.current?.pause(); setActiveId(null); activeRef.current=null; setSource(''); setError(''); setLoading(false); setPosition(0); setDuration(0); setSubtitle(null); } const url=urls.current.get(deleteId); if(url) {URL.revokeObjectURL(url); urls.current.delete(deleteId);} const next=itemsRef.current.filter(i=>i.id!==deleteId); itemsRef.current=next; setItems(next); setSelected(ids=>ids.filter(id=>id!==deleteId));saveCollections(collections.map(c=>({...c,ids:c.ids.filter(id=>id!==deleteId)}))); setDeleteId(null); } catch { notify('Could not remove this video. Cancel any active conversion first.'); } };
+  const removeFromLibrary = async (ids: string[]) => {
+    const unique = [...new Set(ids)].filter(id => itemsRef.current.some(item => item.id === id));
+    if (!unique.length) { setDeleteIds(null); return; }
+    try {
+      for (const id of unique) {
+        const item = itemsRef.current.find(current => current.id === id);
+        if (item?.native) await window.videe?.forgetVideo(id);
+        await removeItem(id);
+        const url = urls.current.get(id);
+        if (url) { URL.revokeObjectURL(url); urls.current.delete(id); }
+      }
+      if (activeRef.current && unique.includes(activeRef.current)) {
+        ++openSequence.current;
+        videoRef.current?.pause();
+        setActiveId(null); activeRef.current = null; setSource(''); setError(''); setLoading(false); setPosition(0); setDuration(0); setSubtitle(null);
+      }
+      const next = itemsRef.current.filter(item => !unique.includes(item.id));
+      itemsRef.current = next;
+      setItems(next);
+      setSelected(current => current.filter(id => !unique.includes(id)));
+      saveCollections(collectionsRef.current.map(collection => ({ ...collection, ids: collection.ids.filter(id => !unique.includes(id)) })));
+      setDeleteIds(null);
+    } catch { notify('Could not remove this video. Cancel any active conversion first.'); }
+  };
+  const confirmDelete = async () => { if (deleteIds?.length) await removeFromLibrary(deleteIds); };
+  const deleteCollection = async (collection: Collection) => {
+    if (collection.kind === 'folder') await removeFromLibrary(collection.ids);
+    saveCollections(collectionsRef.current.filter(current => current.id !== collection.id));
+    setScope(current => current === collection.id ? '' : current);
+  };
   const playlistOrder = collections.find(c=>c.id===scope)?.kind==='playlist' ? collections.find(c=>c.id===scope) : undefined;
   const activeSortKey = sortKey(scope, view, !!playlistOrder);
   const activeSort = (activeSortKey && folderSort[activeSortKey]) || { sort: prefs.sort, dir: prefs.sortDir };
@@ -452,7 +496,7 @@ export default function App() {
 
     {!active && <aside className="library-sidebar"><nav aria-label="Library navigation" data-selected={scope?undefined:view}><span className="nav-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-label={label} title={label} aria-pressed={view===id&&!scope} className={view===id&&!scope?'selected':''} onClick={()=>selectView(id)}><Icon size={20} aria-hidden="true"/></button>)}</nav></aside>}
     <main id="main" tabIndex={-1}>
-      {!active && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>{setViewSlide('in');setScope(value==='unfiled'?'':value);setView('all');setQuery('');}} rename={batchRename}/></div>}
+      {!active && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>{setViewSlide('in');setScope(value==='unfiled'?'':value);setView('all');setQuery('');}} rename={batchRename} onDeleteCollection={deleteCollection}/></div>}
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
@@ -505,7 +549,7 @@ export default function App() {
         </div>
 
         {collections.find(c=>c.id===scope)?.kind==='playlist'&&<button className="secondary-button playlist-play" disabled={!filtered.length} onClick={()=>void openItem(filtered[0],true)}>Play playlist</button>}
-        <div className="library-toolbar">{(selected.length > 0 || playlistOrder) && <div className="library-selection"><span className="selection-status">{selected.length > 0 ? `${selected.length} selected` : 'Playlist order'}</span>{selected.length > 0 && folders.length > 0 && <ChoiceMenu label="Move to" trigger={<><Folder size={19} aria-hidden="true"/><span>Move to</span></>} value="" options={[...(selected.some(id=>folders.some(folder=>folder.ids.includes(id)))?[{value:'library',label:'Remove from folder',icon:<Folder size={17}/>}]:[]),...folders.map(folder=>({value:folder.id,label:folder.name,icon:<Folder size={17}/>}))]} onChange={value=>relocate(selected, value==='library'?'':value)}/>}</div>}<div>{prefs.layout==='grid'&&<ChoiceMenu label="Sort by" trigger={<><ArrowDownWideNarrow size={19} aria-hidden="true"/><span>{sortLabel}</span></>} value={activeSort.sort} disabled={!!playlistOrder} options={[{value:'recent',label:'Recently played'},{value:'name',label:'Name'},{value:'duration',label:'Duration'},{value:'size',label:'Size'}]} onChange={value=>chooseSort(value as LibrarySort)}/>}<div className="layout-switch" data-layout={prefs.layout}><span className="layout-pill" aria-hidden="true"/><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setLayout('grid')}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setLayout('list')}/></div></div></div>
+        <div className="library-toolbar">{(filtered.length > 0 || playlistOrder) && <div className="library-selection">{selected.length > 0 ? <span className="selection-status">{selected.length} selected</span> : playlistOrder ? <span className="selection-status">Playlist order</span> : null}{filtered.length > 0 && (selected.length === filtered.length ? <button type="button" className="secondary-button" onClick={()=>setSelected([])}>Clear</button> : <button type="button" className="secondary-button" onClick={()=>setSelected(filtered.map(item=>item.id))}>Select all</button>)}{selected.length > 0 && folders.length > 0 && <ChoiceMenu label="Move to" trigger={<><Folder size={19} aria-hidden="true"/><span>Move to</span></>} value="" options={[...(selected.some(id=>folders.some(folder=>folder.ids.includes(id)))?[{value:'library',label:'Remove from folder',icon:<Folder size={17}/>}]:[]),...folders.map(folder=>({value:folder.id,label:folder.name,icon:<Folder size={17}/>}))]} onChange={value=>relocate(selected, value==='library'?'':value)}/>}{selected.length > 0 && <button type="button" className="secondary-button collection-delete-action" onClick={()=>setDeleteIds(selected.slice())}><Trash2 size={16} aria-hidden="true"/>Remove from library</button>}</div>}<div>{prefs.layout==='grid'&&<ChoiceMenu label="Sort by" trigger={<><ArrowDownWideNarrow size={19} aria-hidden="true"/><span>{sortLabel}</span></>} value={activeSort.sort} disabled={!!playlistOrder} options={[{value:'recent',label:'Recently played'},{value:'name',label:'Name'},{value:'duration',label:'Duration'},{value:'size',label:'Size'}]} onChange={value=>chooseSort(value as LibrarySort)}/>}<div className="layout-switch" data-layout={prefs.layout}><span className="layout-pill" aria-hidden="true"/><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setLayout('grid')}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setLayout('list')}/></div></div></div>
         {filtered.length > 0 ? <div key={`${view}-${scope}-${prefs.layout}`} data-slide={viewSlide} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>
           {prefs.layout==='list'&&<div className="video-list-head">{SORT_COLUMNS.map(column => <button key={column.id} type="button" className={`list-sort list-sort-${column.id}`} disabled={!!playlistOrder} aria-sort={!playlistOrder && activeSort.sort===column.id ? (activeSort.dir==='asc'?'ascending':'descending') : 'none'} onClick={()=>toggleSort(column.id)}><span>{column.label}</span>{!playlistOrder && activeSort.sort===column.id ? (activeSort.dir==='asc'?<ArrowUp size={12} aria-hidden="true"/>:<ArrowDown size={12} aria-hidden="true"/>) : null}</button>)}<span className="list-actions" aria-hidden="true"/></div>}
           {filtered.map(item => <article className="video-card" key={item.id}>
@@ -518,7 +562,7 @@ export default function App() {
           <button type="button" className={`video-favorite${item.favorite?' active':''}`} aria-pressed={item.favorite} aria-label={item.favorite?`Unfavorite ${item.name}`:`Add ${item.name} to favorites`} title={item.favorite?'Unfavorite':'Add to favorites'} onClick={()=>updateItem(item.id,{favorite:!item.favorite})}><Heart size={16} strokeWidth={1.8} fill={item.favorite?'currentColor':'none'} aria-hidden="true"/></button>
           <details className="file-menu" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.currentTarget.open=false;e.currentTarget.querySelector('summary')?.focus();}}} onBlur={e => { if(!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.open=false; }}>
             <summary aria-label={`Options for ${item.name}`} title="Info"><Info size={18} aria-hidden="true"/></summary>
-            <div className="menu-panel">{item.position>0&&item.position<item.duration-2&&<button aria-label={`Resume ${item.name}`} onClick={e=>{closeMenu(e.currentTarget);void openItem(item,true,true);}}><Play size={16} aria-hidden="true"/>Resume</button>}<button onClick={e=>{setInfoId(item.id);closeMenu(e.currentTarget);}}><Info size={16} aria-hidden="true"/>Video info</button><button aria-label="Reset watch history" disabled={!item.position && !item.lastPlayed} onClick={e=>{updateItem(item.id,{position:0,lastPlayed:0});closeMenu(e.currentTarget);notify('Watch history reset.');}}><RotateCcw size={16} aria-hidden="true"/>Reset</button><button onClick={e => { updateItem(item.id,{favorite:!item.favorite}); closeMenu(e.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? 'Unfavorite' : 'Add to favorites'}</button>{folders.length>0&&<div className="menu-move"><span className="menu-move-label">Move to</span>{folders.some(folder=>folder.ids.includes(item.id))&&<button aria-label="Remove from folder" onClick={e=>{relocate([item.id],'');closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>Remove from folder</button>}{folders.map(folder=><button key={folder.id} aria-label={`Move to ${folder.name}`} onClick={e=>{relocate([item.id],folder.id);closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>{folder.name}</button>)}</div>}<button className="delete-action" onClick={e => { setDeleteId(item.id); closeMenu(e.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>Remove from library</button></div>
+            <div className="menu-panel">{item.position>0&&item.position<item.duration-2&&<button aria-label={`Resume ${item.name}`} onClick={e=>{closeMenu(e.currentTarget);void openItem(item,true,true);}}><Play size={16} aria-hidden="true"/>Resume</button>}<button onClick={e=>{setInfoId(item.id);closeMenu(e.currentTarget);}}><Info size={16} aria-hidden="true"/>Video info</button><button aria-label="Reset watch history" disabled={!item.position && !item.lastPlayed} onClick={e=>{updateItem(item.id,{position:0,lastPlayed:0});closeMenu(e.currentTarget);notify('Watch history reset.');}}><RotateCcw size={16} aria-hidden="true"/>Reset</button><button onClick={e => { updateItem(item.id,{favorite:!item.favorite}); closeMenu(e.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? 'Unfavorite' : 'Add to favorites'}</button>{folders.length>0&&<div className="menu-move"><span className="menu-move-label">Move to</span>{folders.some(folder=>folder.ids.includes(item.id))&&<button aria-label="Remove from folder" onClick={e=>{relocate([item.id],'');closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>Remove from folder</button>}{folders.map(folder=><button key={folder.id} aria-label={`Move to ${folder.name}`} onClick={e=>{relocate([item.id],folder.id);closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>{folder.name}</button>)}</div>}<button className="delete-action" onClick={e => { setDeleteIds([item.id]); closeMenu(e.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>Remove from library</button></div>
           </details>
         </article>)}</div> : <div className="no-results">{!ready ? <span className="sr-only">Loading…</span> : items.length===0 && !query && view==='all' && !scope ? <><Film size={30} aria-hidden="true"/><h2>No videos</h2></> : <><Search size={30} aria-hidden="true"/><h2>{query ? 'No videos found' : view==='continue' ? 'Nothing to continue' : scope?'Empty collection':'No favorites'}</h2><button className="secondary-button" onClick={query ? ()=>setQuery('') : clearFilters}>{query ? 'Reset search' : 'Show all videos'}</button></>}</div>}
       </section>}
@@ -553,6 +597,6 @@ export default function App() {
       {!subtitle && !embeddedTracks.length && <p className="subtle-text">No embedded subtitles. Open a .srt or .vtt file.</p>}
     </Modal>}
     {info && <Modal title="Video info" onClose={()=>setInfoId(null)}><p className="delete-filename">{info.name}</p><dl className="info-list"><div><dt>Size</dt><dd>{sizeLabel(info.size)}</dd></div><div><dt>Duration</dt><dd>{info.duration?timeLabel(info.duration):'—'}</dd></div><div><dt>Position</dt><dd>{timeLabel(info.position)}</dd></div><div><dt>Added</dt><dd>{new Intl.DateTimeFormat(undefined,{dateStyle:'medium'}).format(info.added)}</dd></div><div><dt>Location</dt><dd>{info.native?'File':'Library'}</dd></div></dl></Modal>}
-    {deleteId && <Modal title="Remove from library" onClose={() => setDeleteId(null)}><p className="delete-filename">{items.find(item => item.id === deleteId)?.name}</p><p className="subtle-text">The original file stays.</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteId(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmDelete()}>Remove</button></div></Modal>}
+    {deleteIds && deleteIds.length > 0 && <Modal title="Remove from library" onClose={() => setDeleteIds(null)}><p className="delete-filename">{deleteIds.length === 1 ? (items.find(item => item.id === deleteIds[0])?.name || 'This video') : `${deleteIds.length} videos`}</p><p className="subtle-text">{deleteIds.length === 1 ? 'The original file stays.' : 'Original files stay.'}</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteIds(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmDelete()}>Remove</button></div></Modal>}
   </div>;
 }

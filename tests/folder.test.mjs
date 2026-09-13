@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-const { collectVideoPaths } = createRequire(import.meta.url)('../electron/folder.cjs');
+const { collectVideoPaths, folderGroupName } = createRequire(import.meta.url)('../electron/folder.cjs');
 
 test('folder scan finds nested videos and skips notes, hidden files, and links', async () => {
   const root = await mkdtemp(join(tmpdir(), 'videe-folder-'));
@@ -32,4 +32,10 @@ test('folder scan respects file and depth limits', async () => {
     assert.equal((await collectVideoPaths(root, { maxFiles: 1 })).length, 1);
     assert.equal((await collectVideoPaths(root, { maxDepth: 1 })).includes(join(root, 'a', 'b', 'c', 'Deep.mp4')), false);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('folder group names use the import root and first subdirectory', () => {
+  assert.equal(folderGroupName('/Movies', join('/Movies', 'Show.mp4')), 'Movies');
+  assert.equal(folderGroupName('/Movies', join('/Movies', 'Action', 'Clip.mkv')), 'Action');
+  assert.equal(folderGroupName('/Movies', join('/Movies', 'Action', '2024', 'Clip.mov')), 'Action');
 });

@@ -13,6 +13,34 @@ export function sourceFolderName(files) {
   return names.every(name => name === first) ? first.slice(0, 80) : '';
 }
 
+/** Folder names for an imported tree: root files stay in the root, nested files use the first subdirectory. */
+export function sourceFolderGroups(files) {
+  /** @type {Map<string, typeof files>} */
+  const groups = new Map();
+  for (const file of files) {
+    const parts = String(file?.webkitRelativePath || '').split(/[/\\]/).filter(part => part && part !== '.');
+    if (parts.length < 2) continue;
+    const name = (parts.length === 2 ? parts[0] : parts[1]).slice(0, 80);
+    const list = groups.get(name) || [];
+    list.push(file);
+    groups.set(name, list);
+  }
+  return [...groups].map(([name, grouped]) => ({ name, files: grouped }));
+}
+
+/** Place each named group, then focus the imported root folder when it exists. */
+export function placeInFolders(collections, groups, rootName = '') {
+  let next = collections;
+  for (const group of groups) {
+    if (!group?.name || !group.ids?.length) continue;
+    next = placeInFolder(next, group.name, group.ids).collections;
+  }
+  const root = String(rootName || '').trim().slice(0, 80);
+  const folder = (root && next.find(c => c.kind === 'folder' && c.name === root))
+    || next.find(c => c.kind === 'folder' && groups.some(group => group.name === c.name));
+  return { collections: next, folderId: folder?.id || '' };
+}
+
 /** Put videos in a folder named after the import source. Same name merges; folders stay exclusive. */
 export function placeInFolder(collections, name, ids) {
   const trimmed = String(name || '').trim().slice(0, 80);

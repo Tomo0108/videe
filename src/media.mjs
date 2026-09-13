@@ -1,12 +1,17 @@
 export const EXTENSIONS = ['mp4','m4v','mov','webm','mkv','avi','wmv','flv','mpeg','mpg','m2ts','mts','ts','3gp','ogv','vob','mxf','hevc','av1'];
 export function isVideo(name, type = '') { return type.startsWith('video/') || EXTENSIONS.includes(name.split('.').pop()?.toLowerCase()); }
-export async function filesFromDirectory(handle, acc = [], depth = 0) {
+export async function filesFromDirectory(handle, acc = [], depth = 0, prefix = handle.name || '') {
   if (acc.length >= 1000 || depth > 8) return acc;
   for await (const entry of handle.values()) {
     if (acc.length >= 1000) break;
     if (entry.name.startsWith('.')) continue;
-    if (entry.kind === 'directory') await filesFromDirectory(entry, acc, depth + 1);
-    else if (entry.kind === 'file' && isVideo(entry.name)) acc.push(await entry.getFile());
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.kind === 'directory') await filesFromDirectory(entry, acc, depth + 1, relative);
+    else if (entry.kind === 'file' && isVideo(entry.name)) {
+      const file = await entry.getFile();
+      try { Object.defineProperty(file, 'webkitRelativePath', { value: relative }); } catch { /* File path is informational. */ }
+      acc.push(file);
+    }
   }
   return acc;
 }

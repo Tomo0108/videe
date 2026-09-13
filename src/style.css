@@ -669,6 +669,8 @@ kbd { font: inherit; color: var(--ink); background: var(--group); border: 1px so
 .skip-link:focus { transform: none; }
 .modal, .menu-panel, .choice-options, .collection-picker, .rename-preview, .playlist-editor { overscroll-behavior: contain; }
 .library-selection { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.library-selection .secondary-button { min-height: 34px; padding: 6px 10px; font-size: var(--type-callout); }
+.library-selection .collection-delete-action { gap: 7px; }
 .lock-screen { padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); }
 .no-results p { display: none; }
 .setting-row:has(small) { padding: 0; }
