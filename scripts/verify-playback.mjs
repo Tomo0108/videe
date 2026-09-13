@@ -38,7 +38,6 @@ try {
   assert.equal(await page.getByRole('switch',{name:'Autoplay',exact:true}).isChecked(),false);
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await dialogGone();
-  await page.locator('.library-toolbar summary[aria-label="Sort by"]').click();
   await page.getByRole('button',{name:'Name',exact:true}).click();
   await page.getByRole('button',{name:'Play First.mp4'}).click();await loaded();
   await settings('off');

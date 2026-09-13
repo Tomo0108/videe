@@ -1,7 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownWideNarrow, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, Minimize, MoreHorizontal, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -12,6 +12,7 @@ import {Organization,readCollections,importedName,type Collection} from './organ
 import {placeInFolder,sourceFolderName,moveToFolder} from './collections.mjs';
 import {SecuritySettings} from './security';
 import {useThumbnails,captureFrame,THUMBNAIL_VERSION} from './thumbnails';
+import { compareMedia, DEFAULT_DIR, nextSortPref, readFolderSort, sortKey, writeFolderSort, type LibrarySort } from './library-sort.mjs';
 
 const KEY_LABELS: Record<string, string> = { space: '␣', left: '←', right: '→', up: '↑', down: '↓', esc: 'esc' };
 function ShortcutKeys({ keys }: { keys: string[] }) {
@@ -19,7 +20,16 @@ function ShortcutKeys({ keys }: { keys: string[] }) {
 }
 
 type View = 'all' | 'favorites' | 'continue';
-type Sort = 'recent' | 'name' | 'duration' | 'size';
+const SORT_COLUMNS: { id: LibrarySort; label: string }[] = [
+  { id: 'name', label: 'Name' },
+  { id: 'duration', label: 'Duration' },
+  { id: 'size', label: 'Size' },
+  { id: 'recent', label: 'Played' },
+];
+function playedLabel(item: MediaItem) {
+  if (!item.lastPlayed) return '—';
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(item.lastPlayed);
+}
 function getPreferences(): Preferences { try { return normalizePreferences(JSON.parse(localStorage.getItem('videe-preferences') || '{}')); } catch { return normalizePreferences(null); } }
 function LoopRangeIcon({ size = 18, color, absoluteStrokeWidth: _absoluteStrokeWidth, strokeWidth: _strokeWidth, ...props }: LucideProps) {
   const ink = color ?? 'currentColor';
@@ -32,6 +42,7 @@ export default function App() {
   const [viewSlide, setViewSlide] = useState<'in' | 'fwd' | 'back' | 'grid' | 'list'>('in');
   const [collections,setCollections]=useState(readCollections);
   const [scope,setScope]=useState('');
+  const [folderSort,setFolderSort]=useState(readFolderSort);
   const [selected,setSelected]=useState<string[]>([]);
   const [controlsLocked,setControlsLocked]=useState(false);
   const [looping,setLooping]=useState(false);
@@ -356,9 +367,12 @@ export default function App() {
   const importSubtitle = async (file?: File) => { if(!file) return; try { if(file.size > 5*1024*1024) throw new Error('Choose a subtitle file smaller than 5 MB.'); const text = toVtt(await file.text()); setSubtitle({url:URL.createObjectURL(new Blob([text],{type:'text/vtt'})),name:file.name}); setCaptions(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not load subtitles.'); } };
   const convert = async () => { if(!active?.native || !window.videe) return; setJobKind('convert'); setConversion(0); try { const src = await window.videe.convertVideo(active.id); setError(''); setSource(src); setLoading(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not convert this video.'); } finally { setConversion(null); } };
   const confirmDelete = async () => { if(!deleteId) return; const item = itemsRef.current.find(i=>i.id===deleteId); try { if(item?.native) await window.videe?.forgetVideo(deleteId); await removeItem(deleteId); if(activeId===deleteId) { ++openSequence.current; videoRef.current?.pause(); setActiveId(null); activeRef.current=null; setSource(''); setError(''); setLoading(false); setPosition(0); setDuration(0); setSubtitle(null); } const url=urls.current.get(deleteId); if(url) {URL.revokeObjectURL(url); urls.current.delete(deleteId);} const next=itemsRef.current.filter(i=>i.id!==deleteId); itemsRef.current=next; setItems(next); setSelected(ids=>ids.filter(id=>id!==deleteId));saveCollections(collections.map(c=>({...c,ids:c.ids.filter(id=>id!==deleteId)}))); setDeleteId(null); } catch { notify('Could not remove this video. Cancel any active conversion first.'); } };
+  const playlistOrder = collections.find(c=>c.id===scope)?.kind==='playlist' ? collections.find(c=>c.id===scope) : undefined;
+  const activeSortKey = sortKey(scope, view, !!playlistOrder);
+  const activeSort = (activeSortKey && folderSort[activeSortKey]) || { sort: prefs.sort, dir: prefs.sortDir };
   const filtered = useMemo(() => items
-    .filter(item => (!scope || (scope==='unfiled'?!collections.some(c=>c.kind==='folder'&&c.ids.includes(item.id)):collections.find(c=>c.id===scope)?.ids.includes(item.id))) && (view !== 'favorites' || item.favorite) && (view !== 'continue' || (item.position > 0 && item.position < item.duration - 2)) && item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-    .sort((a,b) => collections.find(c=>c.id===scope)?.kind==='playlist' ? collections.find(c=>c.id===scope)!.ids.indexOf(a.id)-collections.find(c=>c.id===scope)!.ids.indexOf(b.id) : prefs.sort === 'name' ? a.name.localeCompare(b.name, 'en', {numeric:true}) : prefs.sort === 'duration' ? b.duration-a.duration : prefs.sort === 'size' ? b.size-a.size : (b.lastPlayed || b.added) - (a.lastPlayed || a.added)), [items,view,query,prefs.sort,scope,collections]);
+    .filter(item => (!scope || collections.find(c=>c.id===scope)?.ids.includes(item.id)) && (view !== 'favorites' || item.favorite) && (view !== 'continue' || (item.position > 0 && item.position < item.duration - 2)) && item.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+    .sort((a,b) => playlistOrder ? playlistOrder.ids.indexOf(a.id)-playlistOrder.ids.indexOf(b.id) : compareMedia(a,b,activeSort.sort,activeSort.dir)), [items,view,query,activeSort.sort,activeSort.dir,scope,collections,playlistOrder]);
   visibleIds.current = filtered.map(i=>i.id);
 
   const index = queue.current.indexOf(activeId || '');
@@ -367,7 +381,17 @@ export default function App() {
   const siteHref = import.meta.env.DEV ? '/site.html' : '/';
   const destinations = [{id:'all' as View, label:'All videos', icon:Film}, {id:'continue' as View,label:'Continue watching',icon:Clock3}, {id:'favorites' as View,label:'Favorites',icon:Heart}];
   const folders = collections.filter(c => c.kind === 'folder');
-  const sortLabel = {recent: 'Recently played', name: 'Name', duration: 'Longest first', size: 'Largest first'}[prefs.sort];
+  const sortLabel = {recent: 'Recently played', name: 'Name', duration: 'Duration', size: 'Size'}[activeSort.sort];
+  const persistSort = (next: {sort: LibrarySort; dir: string}) => {
+    if (!activeSortKey) return;
+    const dir = next.dir === 'asc' ? 'asc' as const : 'desc' as const;
+    const map = {...folderSort, [activeSortKey]: { sort: next.sort, dir }};
+    setFolderSort(map);
+    try { writeFolderSort(map); } catch { notify('Could not save sort order.'); }
+    if (!scope) setPrefs({...prefs, sort: next.sort, sortDir: dir});
+  };
+  const chooseSort = (sort: LibrarySort) => persistSort({ sort, dir: activeSort.sort === sort ? activeSort.dir : DEFAULT_DIR[sort] });
+  const toggleSort = (sort: LibrarySort) => persistSort(nextSortPref(activeSort, sort));
   const pickingLoop = looping && (ab.a===null || ab.b===null);
   const pickingCut = cutting && (cut.a===null || cut.b===null);
   const range = looping ? ab : cutting ? cut : {a:null,b:null};
@@ -428,7 +452,7 @@ export default function App() {
 
     {!active && <aside className="library-sidebar"><nav aria-label="Library navigation" data-selected={scope?undefined:view}><span className="nav-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-label={label} title={label} aria-pressed={view===id&&!scope} className={view===id&&!scope?'selected':''} onClick={()=>selectView(id)}><Icon size={20} aria-hidden="true"/></button>)}</nav></aside>}
     <main id="main" tabIndex={-1}>
-      {!active && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope} setScope={value=>{setViewSlide('in');setScope(value);setView('all');setQuery('');}} rename={batchRename}/></div>}
+      {!active && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>{setViewSlide('in');setScope(value==='unfiled'?'':value);setView('all');setQuery('');}} rename={batchRename}/></div>}
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
@@ -481,18 +505,20 @@ export default function App() {
         </div>
 
         {collections.find(c=>c.id===scope)?.kind==='playlist'&&<button className="secondary-button playlist-play" disabled={!filtered.length} onClick={()=>void openItem(filtered[0],true)}>Play playlist</button>}
-        <div className="library-toolbar">{(selected.length > 0 || collections.find(c=>c.id===scope)?.kind==='playlist') && <div className="library-selection"><span className="selection-status">{selected.length > 0 ? `${selected.length} selected` : 'Playlist order'}</span>{selected.length > 0 && folders.length > 0 && <ChoiceMenu label="Move to" trigger={<><Folder size={19} aria-hidden="true"/><span>Move to</span></>} value="" options={[{value:'unfiled',label:'Unfiled',icon:<Folder size={17}/>},...folders.map(folder=>({value:folder.id,label:folder.name,icon:<Folder size={17}/>}))]} onChange={value=>relocate(selected, value==='unfiled'?'':value)}/>}</div>}<div><ChoiceMenu label="Sort by" trigger={<><ArrowDownWideNarrow size={19} aria-hidden="true"/><span>{sortLabel}</span></>} value={prefs.sort} disabled={collections.find(c=>c.id===scope)?.kind==='playlist'} options={[{value:'recent',label:'Recently played'},{value:'name',label:'Name'},{value:'duration',label:'Longest first'},{value:'size',label:'Largest first'}]} onChange={value=>setPrefs({...prefs,sort:value as Sort})}/><div className="layout-switch" data-layout={prefs.layout}><span className="layout-pill" aria-hidden="true"/><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setLayout('grid')}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setLayout('list')}/></div></div></div>
-        {filtered.length > 0 ? <div key={`${view}-${scope}-${prefs.layout}`} data-slide={viewSlide} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>{filtered.map(item => <article className="video-card" key={item.id}>
+        <div className="library-toolbar">{(selected.length > 0 || playlistOrder) && <div className="library-selection"><span className="selection-status">{selected.length > 0 ? `${selected.length} selected` : 'Playlist order'}</span>{selected.length > 0 && folders.length > 0 && <ChoiceMenu label="Move to" trigger={<><Folder size={19} aria-hidden="true"/><span>Move to</span></>} value="" options={[...(selected.some(id=>folders.some(folder=>folder.ids.includes(id)))?[{value:'library',label:'Remove from folder',icon:<Folder size={17}/>}]:[]),...folders.map(folder=>({value:folder.id,label:folder.name,icon:<Folder size={17}/>}))]} onChange={value=>relocate(selected, value==='library'?'':value)}/>}</div>}<div>{prefs.layout==='grid'&&<ChoiceMenu label="Sort by" trigger={<><ArrowDownWideNarrow size={19} aria-hidden="true"/><span>{sortLabel}</span></>} value={activeSort.sort} disabled={!!playlistOrder} options={[{value:'recent',label:'Recently played'},{value:'name',label:'Name'},{value:'duration',label:'Duration'},{value:'size',label:'Size'}]} onChange={value=>chooseSort(value as LibrarySort)}/>}<div className="layout-switch" data-layout={prefs.layout}><span className="layout-pill" aria-hidden="true"/><IconButton icon={LayoutGrid} label="Grid view" active={prefs.layout==='grid'} onClick={()=>setLayout('grid')}/><IconButton icon={List} label="List view" active={prefs.layout==='list'} onClick={()=>setLayout('list')}/></div></div></div>
+        {filtered.length > 0 ? <div key={`${view}-${scope}-${prefs.layout}`} data-slide={viewSlide} className={`video-grid ${prefs.layout==='list'?'video-list':''}`}>
+          {prefs.layout==='list'&&<div className="video-list-head">{SORT_COLUMNS.map(column => <button key={column.id} type="button" className={`list-sort list-sort-${column.id}`} disabled={!!playlistOrder} aria-sort={!playlistOrder && activeSort.sort===column.id ? (activeSort.dir==='asc'?'ascending':'descending') : 'none'} onClick={()=>toggleSort(column.id)}><span>{column.label}</span>{!playlistOrder && activeSort.sort===column.id ? (activeSort.dir==='asc'?<ArrowUp size={12} aria-hidden="true"/>:<ArrowDown size={12} aria-hidden="true"/>) : null}</button>)}<span className="list-actions" aria-hidden="true"/></div>}
+          {filtered.map(item => <article className="video-card" key={item.id}>
           <label className="video-select"><input type="checkbox" aria-label={`Select ${item.name}`} checked={selected.includes(item.id)} onChange={e=>setSelected(e.target.checked?[...selected,item.id]:selected.filter(id=>id!==item.id))}/><Check size={14} strokeWidth={2.4} aria-hidden="true"/></label>
           <button className="video-open" onClick={() => void openItem(item)} aria-label={`Play ${item.name}`}>
-            <span className="video-preview"><span className="video-thumbnail">{item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" decoding="async"/> : <Film size={30} strokeWidth={1.2} aria-hidden="true"/>}<span className="thumbnail-play" aria-hidden="true"><Play size={23} fill="currentColor"/></span>{item.duration > 0 && <span className="duration-label">{timeLabel(item.duration)}</span>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100,item.position/item.duration*100)}%`}}/>}</span></span>
+            <span className="video-preview"><span className="video-thumbnail">{item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" decoding="async"/> : <Film size={30} strokeWidth={1.2} aria-hidden="true"/>}<span className="thumbnail-play" aria-hidden="true"><Play size={23} fill="currentColor"/></span>{prefs.layout!=='list'&&item.duration > 0 && <span className="duration-label">{timeLabel(item.duration)}</span>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100,item.position/item.duration*100)}%`}}/>}</span></span>
             <span className="video-title" title={item.name}>{item.name.replace(/\.[^.]+$/,'')}</span>
-            <span className="video-meta">{prefs.layout!=='list'&&item.favorite&&<Heart size={12} fill="currentColor" aria-hidden="true"/>}{prefs.layout==='list'||!(item.position>0&&item.position<item.duration-2) ? sizeLabel(item.size) : `${timeLabel(item.duration-item.position)} left`}</span>
+            {prefs.layout==='list' ? <><span className="video-duration">{item.duration>0?timeLabel(item.duration):'—'}</span><span className="video-size">{sizeLabel(item.size)}</span><span className="video-played">{playedLabel(item)}</span></> : <span className="video-meta">{item.favorite&&<Heart size={12} fill="currentColor" aria-hidden="true"/>}<span>{item.duration>0?timeLabel(item.duration):'—'}</span><span>{sizeLabel(item.size)}</span>{item.position>0&&item.position<item.duration-2&&<span>{timeLabel(item.duration-item.position)} left</span>}</span>}
           </button>
           <button type="button" className={`video-favorite${item.favorite?' active':''}`} aria-pressed={item.favorite} aria-label={item.favorite?`Unfavorite ${item.name}`:`Add ${item.name} to favorites`} title={item.favorite?'Unfavorite':'Add to favorites'} onClick={()=>updateItem(item.id,{favorite:!item.favorite})}><Heart size={16} strokeWidth={1.8} fill={item.favorite?'currentColor':'none'} aria-hidden="true"/></button>
           <details className="file-menu" onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.currentTarget.open=false;e.currentTarget.querySelector('summary')?.focus();}}} onBlur={e => { if(!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.open=false; }}>
-            <summary aria-label={`Options for ${item.name}`} title="More"><MoreHorizontal size={19} aria-hidden="true"/></summary>
-            <div className="menu-panel">{item.position>0&&item.position<item.duration-2&&<button aria-label={`Resume ${item.name}`} onClick={e=>{closeMenu(e.currentTarget);void openItem(item,true,true);}}><Play size={16} aria-hidden="true"/>Resume</button>}<button onClick={e=>{setInfoId(item.id);closeMenu(e.currentTarget);}}><Info size={16} aria-hidden="true"/>Video info</button><button disabled={!item.position && !item.lastPlayed} onClick={e=>{updateItem(item.id,{position:0,lastPlayed:0});closeMenu(e.currentTarget);notify('Watch history reset.');}}><RotateCcw size={16} aria-hidden="true"/>Reset</button><button onClick={e => { updateItem(item.id,{favorite:!item.favorite}); closeMenu(e.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? 'Unfavorite' : 'Add to favorites'}</button>{folders.length>0&&<div className="menu-move"><span className="menu-move-label">Move to</span><button aria-label="Move to Unfiled" onClick={e=>{relocate([item.id],'');closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>Unfiled</button>{folders.map(folder=><button key={folder.id} aria-label={`Move to ${folder.name}`} onClick={e=>{relocate([item.id],folder.id);closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>{folder.name}</button>)}</div>}<button className="delete-action" onClick={e => { setDeleteId(item.id); closeMenu(e.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>Remove from library</button></div>
+            <summary aria-label={`Options for ${item.name}`} title="Info"><Info size={18} aria-hidden="true"/></summary>
+            <div className="menu-panel">{item.position>0&&item.position<item.duration-2&&<button aria-label={`Resume ${item.name}`} onClick={e=>{closeMenu(e.currentTarget);void openItem(item,true,true);}}><Play size={16} aria-hidden="true"/>Resume</button>}<button onClick={e=>{setInfoId(item.id);closeMenu(e.currentTarget);}}><Info size={16} aria-hidden="true"/>Video info</button><button aria-label="Reset watch history" disabled={!item.position && !item.lastPlayed} onClick={e=>{updateItem(item.id,{position:0,lastPlayed:0});closeMenu(e.currentTarget);notify('Watch history reset.');}}><RotateCcw size={16} aria-hidden="true"/>Reset</button><button onClick={e => { updateItem(item.id,{favorite:!item.favorite}); closeMenu(e.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? 'Unfavorite' : 'Add to favorites'}</button>{folders.length>0&&<div className="menu-move"><span className="menu-move-label">Move to</span>{folders.some(folder=>folder.ids.includes(item.id))&&<button aria-label="Remove from folder" onClick={e=>{relocate([item.id],'');closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>Remove from folder</button>}{folders.map(folder=><button key={folder.id} aria-label={`Move to ${folder.name}`} onClick={e=>{relocate([item.id],folder.id);closeMenu(e.currentTarget);}}><Folder size={16} aria-hidden="true"/>{folder.name}</button>)}</div>}<button className="delete-action" onClick={e => { setDeleteId(item.id); closeMenu(e.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>Remove from library</button></div>
           </details>
         </article>)}</div> : <div className="no-results">{!ready ? <span className="sr-only">Loading…</span> : items.length===0 && !query && view==='all' && !scope ? <><Film size={30} aria-hidden="true"/><h2>No videos</h2></> : <><Search size={30} aria-hidden="true"/><h2>{query ? 'No videos found' : view==='continue' ? 'Nothing to continue' : scope?'Empty collection':'No favorites'}</h2><button className="secondary-button" onClick={query ? ()=>setQuery('') : clearFilters}>{query ? 'Reset search' : 'Show all videos'}</button></>}</div>}
       </section>}

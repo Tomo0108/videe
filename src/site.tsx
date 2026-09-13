@@ -1,7 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
 import { Laptop, Monitor, Smartphone, FolderOpen, Captions, History } from 'lucide-react';
-import { RELEASE_REPO, RELEASE_VERSION, RELEASES_API, RELEASES_PAGE, artifactNames, latestDownloadUrl } from './release.mjs';
+import { artifactNames, latestDownloadUrl, RELEASE_REPO, RELEASE_VERSION, RELEASES_API, RELEASES_PAGE } from './release.mjs';
+import { ALTSTORE_ADD, ALTSTORE_JSON, ipaDownloadUrl, versionNote } from './altstore.mjs';
 import '@fontsource-variable/inter-tight';
 import '@fontsource-variable/geist';
 import './site.css';
@@ -15,12 +16,12 @@ const homeHref = import.meta.env.DEV ? '/site.html' : '/';
 const FALLBACK: Record<Platform, Asset> = {
   mac: { href: latestDownloadUrl(NAMES.mac), size: '', available: true },
   win: { href: latestDownloadUrl(NAMES.win), size: '', available: true },
-  ios: { href: latestDownloadUrl(NAMES.ios), size: '', available: true },
+  ios: { href: ipaDownloadUrl(RELEASE_VERSION), size: '', available: true },
 };
 const PLATFORMS: { id: Platform; label: string; cta: string; icon: typeof Laptop }[] = [
   { id: 'mac', label: 'macOS', cta: 'Download for macOS', icon: Laptop },
   { id: 'win', label: 'Windows', cta: 'Download for Windows', icon: Monitor },
-  { id: 'ios', label: 'iOS', cta: 'Download for iOS', icon: Smartphone },
+  { id: 'ios', label: 'iOS', cta: 'Download IPA', icon: Smartphone },
 ];
 
 function formatBytes(bytes: number) {
@@ -102,8 +103,9 @@ function Site() {
                 <span>{currentFile.available ? current.cta : 'View releases'}</span>
               </a>
               <a className="hero-web" href={playerHref}>Web player</a>
+              {os === 'ios' && <a className="hero-web" href={ALTSTORE_ADD}>Add to AltStore</a>}
             </div>
-            <p className="release-note">macOS, Windows & iOS<span>Version {version}{currentFile.size ? ` · ${currentFile.size}` : ''}</span></p>
+            <p className="release-note">macOS, Windows & iOS<span>Version {version}{currentFile.size ? ` · ${currentFile.size}` : ''}</span><span>{versionNote(version)}</span></p>
           </div>
           <div className="hero-art" aria-hidden="true">
             <div className="icon-stage"><img src="./icons/icon-rounded.png" width="512" height="512" alt="" fetchPriority="high" /></div>
@@ -129,13 +131,14 @@ function Site() {
               return <article key={platform.id} className="download-option">
                 <PlatformIcon size={28} strokeWidth={1.5} aria-hidden="true" />
                 <h3>{platform.label}</h3>
-                <p>{platform.id === 'mac' ? '.dmg' : platform.id === 'win' ? '.exe' : '.ipa'}</p>
+                <p>{platform.id === 'mac' ? '.dmg' : platform.id === 'win' ? '.exe' : 'Unsigned .ipa · Finder or Sideloadly'}</p>
                 <a className="platform-download" href={file.available ? file.href : RELEASES_PAGE}>{file.available ? platform.cta : `View ${platform.label} releases`}</a>
+                {platform.id === 'ios' && <a className="platform-download" href={ALTSTORE_ADD}>Add to AltStore</a>}
                 {file.size ? <span className="file-size">{file.size}</span> : null}
               </article>;
             })}
           </div>
-          <p className="download-help"><a href={playerHref}>Web player</a> · <a href={`https://github.com/${RELEASE_REPO}#readme`} rel="noreferrer">Setup</a></p>
+          <p className="download-help">Safari cannot install the IPA. On iPhone, tap Add to AltStore, or download the IPA and install with Sideloadly. <a href={playerHref}>Web player</a> · <a href={ALTSTORE_ADD}>AltStore</a> · <a href={`https://github.com/${RELEASE_REPO}#readme`} rel="noreferrer">Setup</a></p>
         </section>
       </main>
 
@@ -145,7 +148,8 @@ function Site() {
           <a href={`https://github.com/${RELEASE_REPO}`} rel="noreferrer">GitHub</a>
           <a href={playerHref}>Web player</a>
           <a href={RELEASES_PAGE} rel="noreferrer">Releases</a>
-          <a href="./altstore.json" title="AltStore source">AltStore</a>
+          <a href={ALTSTORE_ADD}>AltStore</a>
+          <a href={ALTSTORE_JSON}>AltStore source</a>
         </nav>
       </footer>
     </div>

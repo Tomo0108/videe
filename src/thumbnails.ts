@@ -4,6 +4,9 @@ export const THUMBNAIL_VERSION = 2;
 export function needsThumbnail(item: Pick<MediaItem,'thumbnail'|'thumbnailVersion'>) {
   return !item.thumbnail || item.thumbnailVersion !== THUMBNAIL_VERSION;
 }
+export function needsPreview(item: Pick<MediaItem,'thumbnail'|'thumbnailVersion'|'duration'>) {
+  return needsThumbnail(item) || !(item.duration > 0);
+}
 export function thumbnailSeekTime(duration: number) {
   if (!Number.isFinite(duration) || duration <= 0) return 0;
   return Math.min(1, duration / 10);
@@ -101,7 +104,7 @@ export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string
   itemsRef.current = items;
   const attempted = useRef(new Set<string>());
   const [, kick] = useState(0);
-  const nextId = paused ? '' : items.find(item => needsThumbnail(item) && !attempted.current.has(item.id))?.id || '';
+  const nextId = paused ? '' : items.find(item => needsPreview(item) && !attempted.current.has(item.id))?.id || '';
   useEffect(() => {
     if (!nextId) return;
     const item = itemsRef.current.find(entry => entry.id === nextId);
@@ -115,11 +118,17 @@ export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string
         if (abort.signal.aborted) { if (source.local) URL.revokeObjectURL(source.src); return; }
         local = source.local ? source.src : '';
         if (source.src.startsWith('videe:')) video.crossOrigin = 'anonymous';
-        const painted = waitForPaint(video, abort.signal);
         video.src = source.src;
-        await painted;
+        if (video.readyState < 1) await whenReady(video, 'loadedmetadata', abort.signal);
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
         if (abort.signal.aborted) return;
-        update(item.id, {...captureFrame(video), duration: Number.isFinite(video.duration) ? video.duration : 0});
+        if (needsThumbnail(item)) {
+          await waitForPaint(video, abort.signal);
+          if (abort.signal.aborted) return;
+          update(item.id, {...captureFrame(video), duration});
+        } else if (duration > 0) {
+          update(item.id, { duration });
+        }
       } catch (error) {
         if (abort.signal.aborted || isAbort(error)) return;
         attempted.current.add(item.id);

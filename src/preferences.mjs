@@ -1,4 +1,5 @@
-/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', motion: boolean }} Preferences */
+import { DEFAULT_DIR, normalizeDir, normalizeSort } from './library-sort.mjs';
+/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', sortDir: 'asc'|'desc', motion: boolean }} Preferences */
 export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 /** @param {number} current @param {-1|1} direction */
 export function stepSpeed(current, direction) {
@@ -7,7 +8,7 @@ export function stepSpeed(current, direction) {
   return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, index + direction))];
 }
 /** @type {Preferences} */
-export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'list', sort: 'recent', motion: true };
+export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'list', sort: 'recent', sortDir: DEFAULT_DIR.recent, motion: true };
 /** Validate persisted settings, including migration from the original autoplay setting.
  * @param {unknown} value
  * @returns {Preferences}
@@ -25,7 +26,8 @@ export function normalizePreferences(value) {
   if (data.repeat === 'off' || data.repeat === 'one' || data.repeat === 'all') result.repeat = data.repeat;
   if (data.theme === 'system' || data.theme === 'light' || data.theme === 'dark') result.theme = data.theme;
   if (data.layout === 'grid' || data.layout === 'list') result.layout = data.layout;
-  if (data.sort === 'recent' || data.sort === 'name' || data.sort === 'duration' || data.sort === 'size') result.sort = data.sort;
+  result.sort = normalizeSort(data.sort);
+  result.sortDir = normalizeDir(data.sortDir, result.sort);
   if (typeof data.motion === 'boolean') result.motion = data.motion;
   return result;
 }

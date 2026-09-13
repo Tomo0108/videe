@@ -17,8 +17,16 @@ test('thumbnail seek stays inside short clips and ignores unknown duration', () 
   assert.equal(thumbnailSeekTime(30), 1);
 });
 
+function needsPreview(item) {
+  return needsThumbnail(item) || !(item.duration > 0);
+}
 test('library rows without a current-version still need a thumbnail', () => {
   assert.equal(needsThumbnail({}), true);
   assert.equal(needsThumbnail({ thumbnail: 'data:image/jpeg;base64,xx' }), true);
   assert.equal(needsThumbnail({ thumbnail: 'data:image/jpeg;base64,xx', thumbnailVersion: THUMBNAIL_VERSION }), false);
+});
+test('known thumbnails still need a duration probe', () => {
+  const ready = { thumbnail: 'data:image/jpeg;base64,xx', thumbnailVersion: THUMBNAIL_VERSION, duration: 12 };
+  assert.equal(needsPreview(ready), false);
+  assert.equal(needsPreview({ ...ready, duration: 0 }), true);
 });

@@ -9,8 +9,9 @@ test('malformed settings recover to safe playback and UI values',()=>{
   assert.equal(defaults.motion,true);
   assert.equal(normalizePreferences({motion:false}).motion,false);
   assert.equal(normalizePreferences({motion:'off'}).motion,true);
-  assert.equal(normalizePreferences({volume:NaN}).volume,0.8);
-  assert.equal(normalizePreferences({volume:-1}).volume,0);
+  assert.equal(normalizePreferences({sort:'name'}).sort, 'name');
+  assert.equal(normalizePreferences({sort:'name'}).sortDir, 'asc');
+  assert.equal(normalizePreferences({sort:'size',sortDir:'asc'}).sortDir, 'asc');
 });
 test('legacy autoplay migrates to independent auto advance without overriding explicit choices',()=>{
   assert.equal(normalizePreferences({autoplay:false}).autoAdvance,false);

@@ -77,7 +77,7 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG="v$VERSION"; fi
           FILES=()
           while IFS= read -r file; do FILES+=("$file"); done < <(find dist-apps -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.ipa' \))
-          NOTES=$'Native Videe builds for Mac, Windows, and iOS sideload.\n\nThe web player copies videos into browser storage. These apps open local files instead.\n\nmacOS is unsigned: Control-click Open. Windows may show SmartScreen. iOS IPA is for AltStore or Sideloadly.'
+          NOTES=$(node --input-type=module -e "import { githubReleaseNotes } from './src/altstore.mjs'; import { RELEASE_VERSION } from './src/release.mjs'; process.stdout.write(githubReleaseNotes(RELEASE_VERSION));")
           if [ "${#FILES[@]}" -eq 0 ]; then echo "No app artifacts"; exit 1; fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${FILES[@]}" --clobber

@@ -28,7 +28,7 @@ test('placeInFolder creates or merges exclusive folders by source name', () => {
   assert.deepEqual(merged.collections.find(c => c.id === 'pl').ids, ['a']);
 });
 
-test('moveToFolder sends videos between folders or Unfiled without touching playlists', () => {
+test('moveToFolder sends videos between folders or out of folders without touching playlists', () => {
   const collections = [
     { id: 'f1', name: 'A', kind: 'folder', ids: ['one', 'two'] },
     { id: 'f2', name: 'B', kind: 'folder', ids: ['three'] },

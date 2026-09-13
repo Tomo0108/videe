@@ -37,7 +37,7 @@ export function placeInFolder(collections, name, ids) {
   };
 }
 
-/** Move videos into a folder, playlist, or Unfiled (`dest` empty). Folders remain exclusive. */
+/** Move videos into a folder or playlist. Empty `dest` removes them from folders. */
 export function moveToFolder(collections, ids, dest) {
   const unique = [...new Set(ids.filter(id => typeof id === 'string' && id))];
   if (!unique.length) return collections;

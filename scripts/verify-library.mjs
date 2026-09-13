@@ -26,12 +26,14 @@ try {
   await page.getByRole('button',{name:/Continue watching/}).filter({visible:true}).click();
   assert.equal(await page.locator('.video-card').count(),1);
   await page.getByRole('button',{name:/All videos/}).filter({visible:true}).click();
-  await page.getByRole('combobox',{name:'Sort by'}).selectOption('name');
+  await page.getByRole('button',{name:'Name',exact:true}).click();
   assert.equal(await page.locator('.video-title').first().innerText(),'Alpha');
-  await page.getByRole('button',{name:'List view',exact:true}).click();
+  await page.getByRole('button',{name:'Grid view',exact:true}).click();
   await page.reload();
+  await page.locator('.video-grid:not(.video-list)').waitFor();
+  await page.getByRole('button',{name:'List view',exact:true}).click();
   await page.locator('.video-list').waitFor();
-  assert.equal(await page.getByRole('combobox',{name:'Sort by'}).inputValue(),'name');
+  assert.equal(await page.getByRole('button',{name:'Name',exact:true}).getAttribute('aria-sort'),'ascending');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
   await page.getByRole('button',{name:'Play Alpha.mp4'}).click();
   await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
@@ -60,7 +62,7 @@ try {
   await page.getByRole('button',{name:'Reset watch history'}).click();
   await page.reload();
   await page.getByRole('button',{name:/Continue watching/}).filter({visible:true}).click();
-  await page.getByText('All caught up.').waitFor();
+  await page.getByText('Nothing to continue').waitFor();
   await page.getByRole('button',{name:/All videos/}).filter({visible:true}).click();
   await page.getByRole('button',{name:'Grid view',exact:true}).click();
   await page.screenshot({path:'/tmp/videe-library-dark.png',fullPage:true});

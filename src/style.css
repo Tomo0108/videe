@@ -734,3 +734,159 @@ body { font-weight:400; }
   .no-results { padding: 40px 8px; }
   .setting-row { gap: 16px; }
 }
+
+.library-toolbar { justify-content: flex-end; }
+.library-toolbar:has(.library-selection) { justify-content: space-between; }
+.video-list-head,
+.video-list .video-card {
+  display: grid;
+  grid-template-columns: 32px 112px minmax(6rem, 1fr) 7rem 5.2rem 4.8rem 34px 34px;
+  column-gap: 12px;
+  align-items: stretch;
+}
+.video-list-head {
+  position: sticky;
+  top: 72px;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  min-height: 36px;
+  border-bottom: 1px solid var(--line);
+  background: var(--base);
+}
+.list-sort {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.list-sort svg { flex-shrink: 0; }
+.list-sort-name { justify-content: flex-start; }
+.list-sort:hover:not(:disabled) { color: var(--ink); }
+.list-sort[aria-sort='ascending'],
+.list-sort[aria-sort='descending'] { color: var(--ink); }
+.list-sort:disabled { opacity: .45; cursor: default; }
+.list-sort-name { grid-column: 2 / 4; justify-self: start; }
+.list-sort-duration { grid-column: 4; justify-self: end; }
+.list-sort-size { grid-column: 5; justify-self: end; }
+.list-sort-recent { grid-column: 6; justify-self: end; }
+.video-list .video-open { display: contents; }
+.video-list .video-open:focus-visible .video-preview { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.video-list .video-preview { grid-column: 2; grid-row: 1; width: 112px; }
+.video-list .video-title { grid-column: 3; grid-row: auto; padding: 0; align-self: center; }
+.video-list .video-duration,
+.video-list .video-size,
+.video-list .video-played {
+  color: var(--muted);
+  font-size: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.video-list .video-card .video-favorite {
+  position: static;
+  inset: auto;
+  grid-column: 7;
+  grid-row: auto;
+}
+.video-list .video-card .file-menu {
+  position: relative;
+  inset: auto;
+  grid-column: 8;
+  grid-row: auto;
+  justify-self: stretch;
+}
+.video-list .file-menu .menu-panel { top: 38px; }
+.video-list {
+  gap: 0;
+  --list-rule: color-mix(in srgb, var(--ink) 14%, transparent);
+  --list-head-rule: color-mix(in srgb, var(--ink) 24%, transparent);
+}
+.video-list-head {
+  border-bottom: 1px solid var(--list-head-rule);
+}
+.video-list .video-card {
+  padding: 0;
+  border-bottom: 1px solid var(--list-rule);
+}
+.video-list .video-card:last-child {
+  border-bottom: 1px solid var(--list-rule);
+}
+.video-list .video-select,
+.video-list .video-preview,
+.video-list .video-title,
+.video-list .video-card .video-favorite {
+  align-self: center;
+}
+.video-list .video-preview {
+  margin-block: 12px;
+}
+.list-sort-duration,
+.list-sort-size,
+.list-sort-recent,
+.list-actions,
+.video-list .video-duration,
+.video-list .video-size,
+.video-list .video-played,
+.video-list .video-card .file-menu {
+  align-self: stretch;
+  width: 100%;
+  box-shadow: inset 1px 0 0 var(--list-rule);
+  padding-left: 12px;
+  padding-right: 8px;
+}
+.list-actions {
+  grid-column: 8;
+}
+.video-list .video-card .file-menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.list-sort-duration,
+.list-sort-size,
+.list-sort-recent {
+  justify-content: flex-end;
+}
+.video-list .video-duration,
+.video-list .video-size,
+.video-list .video-played {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .video-list-head { top: calc(68px + env(safe-area-inset-top)); }
+  .video-list-head,
+  .video-list .video-card {
+    grid-template-columns: 34px 48px minmax(0, 1fr) 5.5rem 4.25rem 34px;
+    column-gap: 4px;
+  }
+  .list-sort-duration { grid-column: 4; }
+  .list-sort-size { grid-column: 5; }
+  .list-sort-recent,
+  .video-list .video-played { display: none; }
+  .list-sort-duration,
+  .list-sort-size,
+  .video-list .video-duration,
+  .video-list .video-size {
+    padding-left: 8px;
+    padding-right: 4px;
+  }
+  .video-list .video-preview { width: 48px; }
+  .video-list .video-card .video-favorite { display: none; }
+  .list-actions,
+  .video-list .video-card .file-menu { grid-column: 6; }
+}
+

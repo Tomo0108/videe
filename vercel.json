@@ -19,6 +19,14 @@
       "headers": [
         { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }
       ]
+    },
+    {
+      "source": "/altstore.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
     }
   ]
 }
