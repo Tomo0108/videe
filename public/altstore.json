@@ -13,12 +13,21 @@
       "tintColor": "1F5FD0",
       "category": "entertainment",
       "appPermissions": {},
-      "version": "0.1.4",
-      "versionDate": "2026-09-13T15:04:20Z",
-      "versionDescription": "Sortable library lists with duration and size, per-folder order, and an info button for file details.",
-      "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.4/Videe-0.1.4-ios.ipa",
-      "size": 10980085,
+      "version": "0.1.5",
+      "versionDate": "2026-09-13T15:56:21Z",
+      "versionDescription": "Bulk library removal, nested folder import, and deleting a folder also removes its videos.",
+      "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.5/Videe-0.1.5-ios.ipa",
+      "size": 10980884,
       "versions": [
+        {
+          "version": "0.1.5",
+          "date": "2026-09-13T15:56:21Z",
+          "localizedDescription": "Bulk library removal, nested folder import, and deleting a folder also removes its videos.",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.5/Videe-0.1.5-ios.ipa",
+          "size": 10980884,
+          "minOSVersion": "15.0",
+          "sha256": "803ade0d329ab4d0b8ad1b9d094238f3aa34eb282b3cdbfd9584ffb363a1b29b"
+        },
         {
           "version": "0.1.4",
           "date": "2026-09-13T15:04:20Z",
