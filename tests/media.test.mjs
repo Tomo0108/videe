@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { timeLabel, sizeLabel, toVtt, clampTime, clipLoop, keepSegments, cutFilter, cutMaps, isVideo, filesFromDirectory } from '../src/media.mjs';
+import { timeLabel, sizeLabel, toVtt, clampTime, clipLoop, keepSegments, cutFilter, cutMaps, isVideo, filesFromDirectory, parseSubtitleStreams, subtitleLabel } from '../src/media.mjs';
 test('time formatting handles unknown values and long movies', () => {
   assert.equal(timeLabel(NaN),'0:00'); assert.equal(timeLabel(Infinity),'0:00'); assert.equal(timeLabel(-1),'0:00'); assert.equal(timeLabel(65.8),'1:05'); assert.equal(timeLabel(7384),'2:03:04');
 });
@@ -23,6 +23,20 @@ test('SRT accepts BOM and Windows line endings without corrupting text', () => {
   assert.match(result,/^WEBVTT\n\n/); assert.match(result,/00:00:01\.500 --> 00:00:03\.000/); assert.match(result,/こんにちは, Videe/);
 });
 test('WebVTT is retained; invalid subtitles are rejected', () => { const vtt='WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello'; assert.equal(toVtt(vtt),vtt); assert.throws(()=>toVtt('not subtitles')); });
+test('embedded text subtitle streams are listed and image tracks are skipped', () => {
+  const stderr = `
+    Stream #0:0(und): Video: h264
+    Stream #0:1(jpn): Audio: aac
+    Stream #0:2(jpn): Subtitle: ass (default)
+    Stream #0:3(eng): Subtitle: subrip
+    Stream #0:4(und): Subtitle: hdmv_pgs_subtitle
+  `;
+  assert.deepEqual(parseSubtitleStreams(stderr), [
+    { index: 0, language: 'jpn', codec: 'ass', label: 'Japanese' },
+    { index: 1, language: 'eng', codec: 'subrip', label: 'English' }
+  ]);
+  assert.equal(subtitleLabel('', 2), 'Subtitle 3');
+});
 test('video import is case insensitive and excludes unrelated files', () => { assert.equal(isVideo('Film.MKV'),true); assert.equal(isVideo('film.odd','video/custom'),true); assert.equal(isVideo('note.txt'),false); assert.equal(sizeLabel(1024**3),'1.0 GB'); });
 test('browser folder walk collects nested videos and skips notes', async () => {
   const handle = {

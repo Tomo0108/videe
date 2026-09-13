@@ -13,6 +13,7 @@ test('local video responses support streaming and byte-range seeks', async () =>
     const request = range => new Request('http://localhost/movie', { headers: range ? { Range: range } : {} });
     const all = await mediaResponse(request(),file);
     assert.equal(all.headers.get('Accept-Ranges'),'bytes');
+    assert.equal(all.headers.get('Access-Control-Allow-Origin'),'*');
     assert.equal(all.headers.get('Content-Type'),'video/mp4');
     assert.equal(await all.text(),'0123456789');
     for (const [range, expected, contentRange] of [

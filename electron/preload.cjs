@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('videe', {
   convertVideo: id => ipcRenderer.invoke('convert-video', id),
   cutVideo: (id, start, end, duration) => ipcRenderer.invoke('cut-video', id, start, end, duration),
   cancelConversion: () => ipcRenderer.invoke('cancel-conversion'),
+  listSubtitles: id => ipcRenderer.invoke('list-subtitles', id),
+  extractSubtitle: (id, index) => ipcRenderer.invoke('extract-subtitle', id, index),
   onConversionProgress: callback => { const handler = (_event, value) => callback(value); ipcRenderer.on('conversion-progress', handler); return () => ipcRenderer.removeListener('conversion-progress', handler); }
 });

@@ -1,6 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
+import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownWideNarrow, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, MoreHorizontal, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowDownWideNarrow, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, Minimize, MoreHorizontal, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -25,28 +26,6 @@ function LoopRangeIcon({ size = 18, color, absoluteStrokeWidth: _absoluteStrokeW
   return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" {...props}><path d="M5 12h14" stroke={ink} strokeWidth="2.4"/><circle cx="5" cy="12" r="3.3" fill={ink}/><circle cx="19" cy="12" r="3.3" fill={ink}/></svg>;
 }
 function IconButton({ icon: Icon, label, onClick, disabled, active, className = '' }: { icon: LucideIcon | typeof LoopRangeIcon; label: string; onClick?: () => void; disabled?: boolean; active?: boolean; className?: string }) { return <button className={`icon-button ${active ? 'active' : ''} ${className}`} onClick={onClick} disabled={disabled} aria-pressed={active} aria-label={label} title={label}><Icon size={18} strokeWidth={1.8} aria-hidden="true"/></button>; }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const closed = useRef(false);
-  const dismiss = useCallback(() => {
-    const dialog = ref.current;
-    if (closed.current || !dialog || dialog.hasAttribute('data-leaving')) return;
-    if (document.documentElement.dataset.motion === 'off') { closed.current = true; onClose(); return; }
-    dialog.setAttribute('data-leaving', '');
-    const finish = (event?: AnimationEvent) => {
-      if (event && (event.target !== dialog || event.animationName !== 'videe-sheet-out')) return;
-      if (closed.current) return;
-      closed.current = true;
-      window.clearTimeout(timer);
-      dialog.removeEventListener('animationend', finish);
-      onClose();
-    };
-    const timer = window.setTimeout(() => finish(), 500);
-    dialog.addEventListener('animationend', finish);
-  }, [onClose]);
-  useEffect(() => { const dialog = ref.current!; dialog.showModal(); return () => dialog.close(); }, []);
-  return <dialog ref={ref} onCancel={e => { e.preventDefault(); dismiss(); }} onClick={e => { if(e.target === e.currentTarget) {const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dismiss();} }} aria-label={title} className="modal"><div className="modal-head"><h2>{title}</h2><IconButton icon={X} label="Close" onClick={dismiss}/></div>{children}</dialog>;
-}
 export default function App() {
   const [items, setItems] = useState<MediaItem[]>([]); const itemsRef = useRef(items); itemsRef.current = items;
   const [ready, setReady] = useState(false); const [view, setView] = useState<View>('all');
@@ -68,18 +47,47 @@ export default function App() {
   const [ab, setAb] = useState<{a:number|null;b:number|null}>({a:null,b:null});
   const [chrome, setChrome] = useState(true);
   const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
+  const [embeddedTracks,setEmbeddedTracks] = useState<{index:number;label:string;language:string}[]>([]);
+  const [isFullscreen,setIsFullscreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
   const forceResume = useRef(false); const playAfterLoad = useRef(false); const startFromBeginning = useRef(false);
   const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const dragDepth = useRef(0);
   const chromeHide = useRef(0); const videoClick = useRef(0);
+  const subtitleStateRef = useRef(subtitle); subtitleStateRef.current = subtitle;
   const active = items.find(item => item.id === activeId);
   const notify = useCallback((text: string) => setToast(text), []);
   useEffect(() => { readLibrary().then(data => setItems(data)).catch(() => notify('Could not load your library. Check browser storage permissions.')).finally(() => setReady(true)); return () => { urls.current.forEach(url => URL.revokeObjectURL(url)); }; }, [notify]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 5500); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => { try { localStorage.setItem('videe-preferences', JSON.stringify(prefs)); } catch { notify('Could not save preferences. Check available storage.'); } if(videoRef.current) { videoRef.current.playbackRate = prefs.speed; videoRef.current.volume = prefs.volume; } }, [prefs, notify]);
   useEffect(() => window.videe?.onConversionProgress(({id,seconds}) => { if(id === activeRef.current) setConversion(seconds); }), []);
-  useEffect(() => { if(videoRef.current?.textTracks[0]) videoRef.current.textTracks[0].mode = captions ? 'showing' : 'hidden'; }, [captions,subtitle]);
-  useEffect(() => () => { if(subtitle) URL.revokeObjectURL(subtitle.url); }, [subtitle]);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const tracks = [...video.textTracks].filter(track => track.kind === 'subtitles' || track.kind === 'captions');
+    for (const track of tracks) track.mode = 'hidden';
+    if (!captions || !tracks.length) return;
+    const match = subtitle?.name ? tracks.find(track => track.label === subtitle.name) : null;
+    (match || tracks[0]).mode = 'showing';
+  }, [captions, subtitle, source]);
+  useEffect(() => () => { if(subtitle?.url) URL.revokeObjectURL(subtitle.url); }, [subtitle]);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const sync = () => {
+      if (subtitleStateRef.current?.url) return;
+      const tracks = [...video.textTracks].filter(track => track.kind === 'subtitles' || track.kind === 'captions');
+      const pick = tracks.find(track => /ja|jpn/i.test(`${track.language} ${track.label}`)) || tracks[0];
+      if (pick && !subtitleStateRef.current) setSubtitle({ url: '', name: pick.label || pick.language || 'Embedded subtitles' });
+    };
+    video.textTracks.addEventListener('addtrack', sync);
+    sync();
+    return () => video.textTracks.removeEventListener('addtrack', sync);
+  }, [source]);
+  useEffect(() => {
+    const sync = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, []);
   const updateItem = useCallback((id: string, changes: Partial<MediaItem>, persist = true) => {
     const item = itemsRef.current.find(i => i.id === id); if(!item) return;
     const updated = {...item,...changes}; const next = itemsRef.current.map(i => i.id === id ? updated : i); itemsRef.current = next; setItems(next);
@@ -92,13 +100,22 @@ export default function App() {
   const relocate=(ids:string[],dest:string)=>{if(!ids.length)return;if(saveCollections(moveToFolder(collections,ids,dest)))setSelected(current=>current.filter(id=>!ids.includes(id)));};
   const batchRename=async(names:Map<string,string>)=>{await renameItems(names);const next=itemsRef.current.map(i=>names.has(i.id)?{...i,originalName:i.originalName||i.name,name:names.get(i.id)!}:i);itemsRef.current=next;setItems(next);};
   const saveProgress = useCallback(() => { const video = videoRef.current; if(activeRef.current && video && Number.isFinite(video.currentTime)) updateItem(activeRef.current, {position: video.ended ? 0 : video.currentTime}); }, [updateItem]);
+  const applyEmbedded = useCallback(async (itemId: string, index: number, label: string, sequence: number) => {
+    if (!window.videe?.extractSubtitle) return;
+    try {
+      const text = await window.videe.extractSubtitle(itemId, index);
+      if (sequence !== openSequence.current) return;
+      setSubtitle({ url: URL.createObjectURL(new Blob([text], { type: 'text/vtt' })), name: label });
+      setCaptions(true);
+    } catch { if (sequence === openSequence.current) notify('Could not read embedded subtitles.'); }
+  }, [notify]);
   useEffect(() => { const handler = () => { if(document.visibilityState === 'hidden') saveProgress(); }; document.addEventListener('visibilitychange',handler); return () => document.removeEventListener('visibilitychange',handler); }, [saveProgress]);
   const openItem = useCallback(async (item: MediaItem, continuePlayback = false, resumePlayback = false) => {
     if(conversion !== null) { notify('Finish or cancel the current video task before switching.'); return; }
     if(!activeRef.current) queue.current = visibleIds.current;
     if(!queue.current.includes(item.id)) queue.current = [...queue.current, item.id];
     saveProgress(); forceResume.current = resumePlayback; playAfterLoad.current = continuePlayback; startFromBeginning.current = continuePlayback; const sequence = ++openSequence.current;
-    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setChrome(true); lastSave.current = 0;
+    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); lastSave.current = 0;
     try {
       let src: string;
       if(item.native && window.videe) src = await window.videe.getSource(item.id);
@@ -115,8 +132,19 @@ export default function App() {
       }
       if(sequence !== openSequence.current) return;
       setSource(src); updateItem(item.id, {lastPlayed: Date.now()});
+      if (item.native && window.videe?.listSubtitles) {
+        void (async () => {
+          try {
+            const tracks = await window.videe!.listSubtitles!(item.id);
+            if (sequence !== openSequence.current) return;
+            setEmbeddedTracks(tracks);
+            const pick = tracks.find(track => /^(ja|jpn)/i.test(track.language)) || tracks[0];
+            if (pick) await applyEmbedded(item.id, pick.index, pick.label, sequence);
+          } catch { if (sequence === openSequence.current) setEmbeddedTracks([]); }
+        })();
+      }
     } catch(e) { if(sequence === openSequence.current) { setError(e instanceof Error ? e.message : 'Could not open this video.'); setLoading(false); } }
-  }, [conversion,notify,saveProgress,updateItem]);
+  }, [applyEmbedded,conversion,notify,saveProgress,updateItem]);
   const importFiles = async (files: File[]) => {
     if(busy || !ready || controlsLocked) return;
     const folderName = sourceFolderName(files);
@@ -213,12 +241,12 @@ export default function App() {
       else if (e.key === ',' || e.key === '.') { e.preventDefault(); video?.pause(); seek(time + (e.key === '.' ? 1 / 30 : -1 / 30)); }
       else if (e.key.toLowerCase() === 'f') void fullscreen();
       else if (e.key.toLowerCase() === 'm') setMuted(value => !value);
-      else if (e.key.toLowerCase() === 'c') { if (subtitle) setCaptions(value => !value); else setModal('subtitles'); }
+      else if (e.key.toLowerCase() === 'c') { if (subtitle || embeddedTracks.length) setCaptions(value => !value); else setModal('subtitles'); }
       revealChrome();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [togglePlay, seek, fullscreen, modal, deleteId, infoId, controlsLocked, subtitle, revealChrome]);
+  }, [togglePlay, seek, fullscreen, modal, deleteId, infoId, controlsLocked, subtitle, embeddedTracks.length, revealChrome]);
   useEffect(() => {
     if (!active || !('mediaSession' in navigator)) return;
     const session = navigator.mediaSession;
@@ -360,7 +388,7 @@ export default function App() {
   const closePlayer = () => {
     if(conversion !== null) { notify('Cancel the current video task before returning to the library.'); return; }
     saveProgress(); videoRef.current?.pause(); ++openSequence.current;
-    activeRef.current = null; setActiveId(null); setSource(''); setError(''); setLoading(false); setPlaying(false); setSubtitle(null); setViewSlide('in');
+    activeRef.current = null; setActiveId(null); setSource(''); setError(''); setLoading(false); setPlaying(false); setSubtitle(null); setEmbeddedTracks([]); setViewSlide('in');
   };
   const closeMenu = (element: HTMLElement) => element.closest('details')?.removeAttribute('open');
   useEffect(() => {
@@ -404,7 +432,7 @@ export default function App() {
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
-            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}setPosition(t);if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle&&<track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
+            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}setPosition(t);if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
             {loading && !error && conversion===null && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}
             {conversion!==null && jobKind==='cut' && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>Removing segment · {timeLabel(conversion)}</span><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</button></div>}
             {error && <div className="player-error"><Film size={28} aria-hidden="true"/><h2>Can’t play</h2>
@@ -439,7 +467,7 @@ export default function App() {
                   <select className="speed-select" aria-label="Playback speed" value={prefs.speed} onChange={e => setPrefs({...prefs,speed:Number(e.target.value)})}>{SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select>
                   <button aria-label="Subtitles" title="Subtitles" className={`caption-button ${subtitle && captions ? 'active' : ''}`} onClick={() => setModal('subtitles')}><Captions size={18} aria-hidden="true"/></button>
                   <IconButton icon={PictureInPicture2} label="Picture in Picture" onClick={() => void pictureInPicture()}/>
-                  <IconButton icon={Maximize} label="Full screen" onClick={() => void fullscreen()}/>
+                  <IconButton icon={isFullscreen ? Minimize : Maximize} label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => void fullscreen()}/>
                 </div>
               </div>
             </div>
@@ -492,9 +520,11 @@ export default function App() {
       <div className="modal-actions"><button className="secondary-button" onClick={() => setModal(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmCut()}>Remove</button></div>
     </Modal>}
     {modal === 'subtitles' && <Modal title="Subtitles" onClose={() => setModal(null)}>
-      {subtitle && <><label className="setting-row"><span>Show subtitles</span><input type="checkbox" role="switch" checked={captions} onChange={e => setCaptions(e.target.checked)}/></label><p className="subtitle-filename">{subtitle.name}</p></>}
-      <button className="secondary-button subtitle-import" onClick={() => subtitleRef.current?.click()}><FolderOpen size={17}/>{subtitle ? 'Replace subtitles' : 'Open subtitles'}</button>
-      {!subtitle && <p className="subtle-text">.srt or .vtt</p>}
+      {(subtitle || embeddedTracks.length > 0) && <label className="setting-row"><span>Show subtitles</span><input type="checkbox" role="switch" checked={captions} onChange={e => setCaptions(e.target.checked)}/></label>}
+      {embeddedTracks.length > 0 && <div className="subtitle-tracks" role="group" aria-label="Embedded subtitles">{embeddedTracks.map(track => <button key={track.index} type="button" className="secondary-button" aria-pressed={subtitle?.name===track.label} onClick={() => { if (activeId) void applyEmbedded(activeId, track.index, track.label, openSequence.current); }}>{track.label}</button>)}</div>}
+      {subtitle?.name && <p className="subtitle-filename">{subtitle.name}</p>}
+      <button className="secondary-button subtitle-import" onClick={() => subtitleRef.current?.click()}><FolderOpen size={17}/>{subtitle?.url ? 'Replace subtitles' : 'Open subtitles'}</button>
+      {!subtitle && !embeddedTracks.length && <p className="subtle-text">No embedded subtitles. Open a .srt or .vtt file.</p>}
     </Modal>}
     {info && <Modal title="Video info" onClose={()=>setInfoId(null)}><p className="delete-filename">{info.name}</p><dl className="info-list"><div><dt>Size</dt><dd>{sizeLabel(info.size)}</dd></div><div><dt>Duration</dt><dd>{info.duration?timeLabel(info.duration):'—'}</dd></div><div><dt>Position</dt><dd>{timeLabel(info.position)}</dd></div><div><dt>Added</dt><dd>{new Intl.DateTimeFormat(undefined,{dateStyle:'medium'}).format(info.added)}</dd></div><div><dt>Location</dt><dd>{info.native?'File':'Library'}</dd></div></dl></Modal>}
     {deleteId && <Modal title="Remove from library" onClose={() => setDeleteId(null)}><p className="delete-filename">{items.find(item => item.id === deleteId)?.name}</p><p className="subtle-text">The original file stays.</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteId(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmDelete()}>Remove</button></div></Modal>}

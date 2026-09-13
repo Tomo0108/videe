@@ -15,11 +15,19 @@
       "appPermissions": {},
       "versions": [
         {
+          "version": "0.1.3",
+          "buildVersion": "4",
+          "date": "2026-09-13",
+          "localizedDescription": "Embedded subtitles, folder deletion, and a full-screen player that fills 4K displays.",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/latest/download/Videe-0.1.3-ios.ipa",
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.2",
           "buildVersion": "3",
           "date": "2026-09-13",
           "localizedDescription": "Folders, loop ranges, segment removal, and a calmer library.",
-          "downloadURL": "https://github.com/Tomo0108/videe/releases/latest/download/Videe-0.1.2-ios.ipa",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.2/Videe-0.1.2-ios.ipa",
           "minOSVersion": "15.0"
         },
         {

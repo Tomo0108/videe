@@ -21,6 +21,7 @@ try {
   await chooser.setFiles(root);
   await page.locator('.video-card').nth(1).waitFor();
   assert.equal(await page.locator('.video-card').count(), 2);
+  await page.waitForFunction(() => document.querySelectorAll('.video-thumbnail img').length === 2, null, { timeout: 20000 });
   assert.equal(await page.locator('.video-list').count(), 1);
   assert.equal(await page.locator('.collection-name').innerText(), basename(root));
   await page.getByRole('checkbox', { name: 'Select Inside.mp4', exact: true }).check();
@@ -33,8 +34,14 @@ try {
   await page.locator('.organization summary[aria-label="Collection"]').click();
   await page.locator('.organization .choice-options').getByRole('button', { name: 'Unfiled', exact: true }).click();
   assert.equal(await page.locator('.video-card').count(), 2);
+  await page.locator('.organization summary[aria-label="Collection"]').click();
+  await page.locator('.organization .choice-options').getByRole('button', { name: basename(root), exact: true }).click();
+  await page.getByRole('button', { name: 'Delete folder', exact: true }).click();
+  await page.locator('dialog.modal').getByRole('button', { name: 'Delete folder', exact: true }).click();
+  await page.locator('dialog.modal').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.collection-name').count(), 0);
   await page.getByRole('button', { name: 'Open folder', exact: true }).waitFor();
-  console.log('PASS: Open folder icon imports into a named folder, defaults to list, and moves videos.');
+  console.log('PASS: Open folder icon imports into a named folder, defaults to list, moves videos, and deletes the folder.');
 } catch (error) {
   await page.screenshot({ path: '/tmp/videe-folder-failure.png', fullPage: true });
   throw error;

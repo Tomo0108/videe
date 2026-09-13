@@ -58,3 +58,24 @@ export function cutMaps(parts, audio) {
   if (parts.length === 1) return audio ? ['-map', '[v0]', '-map', '[a0]'] : ['-map', '[v0]'];
   return audio ? ['-map', '[v]', '-map', '[a]'] : ['-map', '[v]'];
 }
+const IMAGE_SUBTITLES = /pgs|dvd_subtitle|dvb_sub|hdmv|xsub/i;
+const TEXT_SUBTITLES = /subrip|ass|ssa|webvtt|mov_text|srt|text|eia_608|ttml|microdvd/i;
+const LANGUAGE_NAMES = { ja: 'Japanese', jpn: 'Japanese', en: 'English', eng: 'English', ko: 'Korean', kor: 'Korean', zh: 'Chinese', zho: 'Chinese', chi: 'Chinese' };
+export function subtitleLabel(language, index) {
+  const name = LANGUAGE_NAMES[String(language || '').toLowerCase()] || language;
+  return name || `Subtitle ${index + 1}`;
+}
+export function parseSubtitleStreams(stderr) {
+  const tracks = [];
+  let ordinal = 0;
+  const lineRe = /^\s*Stream #0:\d+(?:\[[^\]]*\])?(?:\((\w+)\))?: Subtitle:\s*([^\s,]+)/gm;
+  let match;
+  while ((match = lineRe.exec(String(stderr || '')))) {
+    const language = match[1] || '';
+    const codec = match[2] || '';
+    const index = ordinal++;
+    if (IMAGE_SUBTITLES.test(codec) || !TEXT_SUBTITLES.test(codec)) continue;
+    tracks.push({ index, language, codec, label: subtitleLabel(language, index) });
+  }
+  return tracks;
+}

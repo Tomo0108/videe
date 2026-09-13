@@ -6,22 +6,24 @@ const { collectVideoPaths } = require('./folder.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
-protocol.registerSchemesAsPrivileged([{ scheme: 'videe', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'videe', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
 if (!app.isPackaged && process.env.VIDEE_TEST_USER_DATA) app.setPath('userData', process.env.VIDEE_TEST_USER_DATA);
 let win, registry = {}, processJob, registryFile, cacheDir;
 let writeQueue = Promise.resolve();
 function persist() { writeQueue = writeQueue.then(async () => { const tmp = registryFile + '.tmp'; await fs.writeFile(tmp, JSON.stringify(registry)); await fs.rename(tmp, registryFile); }); return writeQueue; }
 function ffmpegBinary() { return require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked'); }
-async function probeAudio(input) {
-  const binary = ffmpegBinary();
+function ffmpegProbe(input) {
   return new Promise(resolve => {
-    const child = spawn(binary, ['-hide_banner', '-i', input], { windowsHide: true });
+    const child = spawn(ffmpegBinary(), ['-hide_banner', '-i', input], { windowsHide: true });
     let stderr = '';
-    const timer = setTimeout(() => child.kill('SIGTERM'), 4000);
-    child.stderr.on('data', data => { stderr = (stderr + data).slice(-8000); });
-    child.on('error', () => { clearTimeout(timer); resolve(false); });
-    child.on('close', () => { clearTimeout(timer); resolve(/^\s*Stream #0:\d+.+: Audio:/m.test(stderr)); });
+    const timer = setTimeout(() => child.kill('SIGTERM'), 8000);
+    child.stderr.on('data', data => { stderr = (stderr + data).slice(-20000); });
+    child.on('error', () => { clearTimeout(timer); resolve(''); });
+    child.on('close', () => { clearTimeout(timer); resolve(stderr); });
   });
+}
+async function probeAudio(input) {
+  return /^\s*Stream #0:\d+.+: Audio:/m.test(await ffmpegProbe(input));
 }
 function runEncode(id, args) {
   const binary = ffmpegBinary();
@@ -125,6 +127,41 @@ app.whenReady().then(async () => {
     const audio = await probeAudio(input);
     const result = await runEncode(id, ['-i', input, '-filter_complex', cutFilter(parts, audio), ...cutMaps(parts, audio), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21', '-pix_fmt', 'yuv420p', ...(audio ? ['-c:a', 'aac', '-b:a', '192k'] : ['-an'])]);
     return result;
+  });
+  register('list-subtitles', async id => {
+    const entry = registry[id];
+    if (!entry) throw new Error('Video not found.');
+    const input = entry.path || entry.converted;
+    await fs.access(input);
+    const { parseSubtitleStreams } = await import('../src/media.mjs');
+    return parseSubtitleStreams(await ffmpegProbe(input));
+  });
+  register('extract-subtitle', async (id, index) => {
+    const entry = registry[id];
+    if (!entry) throw new Error('Video not found.');
+    if (!Number.isInteger(index) || index < 0 || index > 31) throw new Error('Subtitle track not found.');
+    const input = entry.path || entry.converted;
+    await fs.access(ffmpegBinary());
+    await fs.access(input);
+    const { parseSubtitleStreams, toVtt } = await import('../src/media.mjs');
+    const tracks = parseSubtitleStreams(await ffmpegProbe(input));
+    if (!tracks.some(track => track.index === index)) throw new Error('Subtitle track not found.');
+    const text = await new Promise((resolve, reject) => {
+      const child = spawn(ffmpegBinary(), ['-hide_banner', '-nostdin', '-i', input, '-map', `0:s:${index}`, '-f', 'webvtt', 'pipe:1'], { windowsHide: true });
+      const chunks = [];
+      let stderr = '';
+      const timer = setTimeout(() => child.kill('SIGTERM'), 20000);
+      child.stdout.on('data', data => { chunks.push(data); if (chunks.reduce((sum, chunk) => sum + chunk.length, 0) > 5 * 1024 * 1024) child.kill('SIGTERM'); });
+      child.stderr.on('data', data => { stderr = (stderr + data).slice(-3000); });
+      child.on('error', () => { clearTimeout(timer); reject(new Error('Could not read embedded subtitles.')); });
+      child.on('close', code => {
+        clearTimeout(timer);
+        if (code !== 0) return reject(new Error('Could not read embedded subtitles.'));
+        resolve(Buffer.concat(chunks).toString('utf8'));
+      });
+    });
+    if (!text.trim()) throw new Error('Could not read embedded subtitles.');
+    return toVtt(text);
   });
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

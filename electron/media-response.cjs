@@ -5,17 +5,17 @@ const { extname } = require('node:path');
 
 // Advertise and serve byte ranges so seeking works before the whole file is buffered.
 async function mediaResponse(request, filePath) {
-  if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405 });
+  if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
   const info = await stat(filePath);
-  if (!info.isFile()) return new Response(null, { status: 404 });
+  if (!info.isFile()) return new Response(null, { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } });
   const size = info.size;
   const types = { '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.ogv': 'video/ogg', '.avi': 'video/x-msvideo', '.mkv': 'video/x-matroska' };
-  const headers = { 'Accept-Ranges': 'bytes', 'Content-Type': types[extname(filePath).toLowerCase()] || 'application/octet-stream', 'Content-Length': String(size) };
+  const headers = { 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*', 'Content-Type': types[extname(filePath).toLowerCase()] || 'application/octet-stream', 'Content-Length': String(size) };
   let start = 0, end = size - 1, status = 200;
   const range = request.headers.get('Range');
   if (range) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-    const invalid = () => new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes' } });
+    const invalid = () => new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}`, 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' } });
     if (!match || (!match[1] && !match[2]) || !size) return invalid();
     if (!match[1]) {
       const suffix = Number(match[2]);
