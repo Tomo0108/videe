@@ -13,7 +13,10 @@ export function sourceFolderName(files) {
   return names.every(name => name === first) ? first.slice(0, 80) : '';
 }
 
-/** Folder names for an imported tree: root files stay in the root, nested files use the first subdirectory. */
+/** Folder names for an imported tree: root files stay in the root, nested files use the first subdirectory.
+ *  @param {File[]} files
+ *  @returns {{name: string, files: File[]}[]}
+ */
 export function sourceFolderGroups(files) {
   /** @type {Map<string, typeof files>} */
   const groups = new Map();

@@ -181,7 +181,7 @@ export default function App() {
         try { await saveItem(item); } catch { transient = true; }
         const next = [...itemsRef.current,item]; itemsRef.current = next; setItems(next); first ||= item; count++; importedIds.push(item.id); folderIds.push(item.id); imported.set(file, item.id);
       }
-      const named = groups.map(group => ({ name: group.name, ids: group.files.map(file => imported.get(file)).filter((id): id is string => !!id) })).filter(group => group.ids.length);
+      const named = groups.map(group => ({ name: group.name, ids: group.files.map((file: File) => imported.get(file)).filter((id: string | undefined): id is string => !!id) })).filter(group => group.ids.length);
       if(named.length) fileIntoFolders(named, folderName);
       else if(folderName) fileIntoFolder(folderName, folderIds);
       else fileIntoScope(importedIds);
