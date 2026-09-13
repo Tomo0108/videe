@@ -1,6 +1,6 @@
 {
   "name": "videe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Videe",
   "author": "Videe",
@@ -31,7 +31,8 @@
     "test:tools": "node scripts/verify-tools.mjs",
     "test:storage": "node scripts/verify-storage.mjs",
     "test:organization": "node scripts/verify-organization.mjs",
-    "test:collections": "node scripts/verify-collections.mjs"
+    "test:collections": "node scripts/verify-collections.mjs",
+    "test:folder": "node scripts/verify-folder.mjs"
   },
   "build": {
     "appId": "app.videe.player",
@@ -43,6 +44,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "src/media.mjs",
       "package.json"
     ],
     "asarUnpack": [

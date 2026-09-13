@@ -1,6 +1,13 @@
 /** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', motion: boolean }} Preferences */
+export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+/** @param {number} current @param {-1|1} direction */
+export function stepSpeed(current, direction) {
+  const from = SPEEDS.indexOf(current);
+  const index = from === -1 ? SPEEDS.indexOf(1) : from;
+  return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, index + direction))];
+}
 /** @type {Preferences} */
-export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'grid', sort: 'recent', motion: true };
+export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'list', sort: 'recent', motion: true };
 /** Validate persisted settings, including migration from the original autoplay setting.
  * @param {unknown} value
  * @returns {Preferences}
@@ -14,7 +21,7 @@ export function normalizePreferences(value) {
   }
   if (typeof data.autoAdvance !== 'boolean' && typeof data.autoplay === 'boolean') result.autoAdvance = data.autoplay;
   if (typeof data.volume === 'number' && Number.isFinite(data.volume)) result.volume = Math.max(0, Math.min(1, data.volume));
-  if (typeof data.speed === 'number' && [0.5,0.75,1,1.25,1.5,1.75,2].includes(data.speed)) result.speed = data.speed;
+  if (typeof data.speed === 'number' && SPEEDS.includes(data.speed)) result.speed = data.speed;
   if (data.repeat === 'off' || data.repeat === 'one' || data.repeat === 'all') result.repeat = data.repeat;
   if (data.theme === 'system' || data.theme === 'light' || data.theme === 'dark') result.theme = data.theme;
   if (data.layout === 'grid' || data.layout === 'list') result.layout = data.layout;

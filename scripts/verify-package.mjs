@@ -12,6 +12,7 @@ try {
   const page=await app.firstWindow();
   await page.locator('.brand').waitFor();
   assert.equal(await page.evaluate(()=>typeof window.videe?.convertVideo),'function');
+  assert.equal(await page.evaluate(()=>typeof window.videe?.cutVideo),'function');
   const result=await app.evaluate(({app})=>({packaged:app.isPackaged,path:app.getAppPath(),userData:app.getPath('userData')}));
   assert.equal(result.packaged,true);
   assert.equal(await page.evaluate(()=>window.videe.platform),'darwin');

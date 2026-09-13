@@ -7,8 +7,11 @@ const errors = []; page.on('pageerror', error=>errors.push(error.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
   await page.goto('http://127.0.0.1:5173');
-  await page.waitForFunction(()=>!document.querySelector('.open-button')?.disabled);
-  assert.equal(await page.getByRole('button',{name:'Open video',exact:true}).count(),1);
+  await page.waitForFunction(()=>!document.querySelector('.header-open')?.disabled);
+  assert.equal(await page.locator('.library-section').count(),1);
+  assert.equal(await page.getByRole('heading',{name:'No videos',exact:true}).count(),1);
+  assert.equal(await page.getByRole('button',{name:'Open folder',exact:true}).count(),1);
+  assert.equal(await page.getByRole('button',{name:'Open video',exact:true}).count(),0);
   assert.equal(await page.getByRole('slider').count(),0);
   assert.equal(await page.locator('.sidebar,.queue-panel,.filter-row,.playback-bar').count(),0);
   await page.screenshot({path:'/tmp/videe-redesign-empty.png',fullPage:true});
@@ -22,7 +25,7 @@ try {
   assert.equal(await page.locator('video').evaluate(video=>video.playbackRate),1.5);
   await page.getByRole('button',{name:'Subtitles',exact:true}).click();
   await page.getByRole('button',{name:'Open subtitles'}).waitFor();
-  await page.locator('input[type=file]').nth(1).setInputFiles(resolve('tests/fixtures/subtitle.srt'));
+  await page.locator('input[accept=".srt,.vtt"]').setInputFiles(resolve('tests/fixtures/subtitle.srt'));
   await page.waitForFunction(()=>document.querySelector('video')?.textTracks[0]?.cues?.length===1);
   await page.getByRole('switch',{name:'Show subtitles'}).uncheck();
   assert.equal(await page.locator('video').evaluate(video=>video.textTracks[0].mode),'hidden');
@@ -36,7 +39,7 @@ try {
   await page.getByRole('button',{name:'Full screen'}).click();
   await page.waitForFunction(()=>!!document.fullscreenElement);
   await page.getByRole('slider',{name:'Playback position'}).fill('6');
-  await page.getByRole('button',{name:'Full screen'}).click();
+  await page.keyboard.press('Escape');
   await page.waitForFunction(()=>!document.fullscreenElement);
   await page.screenshot({path:'/tmp/videe-redesign-player.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
@@ -44,11 +47,10 @@ try {
   await page.screenshot({path:'/tmp/videe-redesign-mobile-player.png',fullPage:true});
   await page.getByRole('button',{name:'Back to library'}).click();
   assert.equal(await page.locator('video').count(),0);
-  await page.locator('summary[aria-label="Options for sample.mp4"]').click();
-  await page.getByRole('button',{name:'Add to favorites',exact:true}).click();
+  await page.getByRole('button',{name:'Add sample.mp4 to favorites',exact:true}).click();
   await page.getByRole('button',{name:'Favorites',exact:true}).click();
   assert.equal(await page.locator('.video-card').count(),1);
-  await page.getByRole('textbox',{name:'Search videos'}).fill('absent');
+  await page.getByRole('searchbox',{name:'Search videos'}).fill('absent');
   await page.getByText('No videos found').waitFor();
   await page.getByRole('button',{name:'Clear search'}).click();
   await page.setViewportSize({width:1440,height:940});
@@ -67,9 +69,11 @@ try {
   await page.getByRole('button',{name:'Remove from library',exact:true}).click();
   await page.getByRole('button',{name:'Remove',exact:true}).click();
   await dialogGone();
-  await page.getByRole('button',{name:'Open video',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Open folder',exact:true}).first().waitFor();
+  await page.getByRole('heading',{name:'No videos',exact:true}).waitFor();
   await page.reload();
-  await page.getByRole('button',{name:'Open video',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Open folder',exact:true}).first().waitFor();
+  await page.getByRole('heading',{name:'No videos',exact:true}).waitFor();
   assert.deepEqual(errors,[]);
   console.log('PASS: simplified empty/library/player flows, playback, seek, explicit speed selection, subtitles, fullscreen, favorites, search, persisted resume/settings, mobile layout, deletion; no runtime errors.');
 } catch(error) { await page.screenshot({path:'/tmp/videe-redesign-failure.png',fullPage:true}); throw error; }

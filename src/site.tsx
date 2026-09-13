@@ -1,8 +1,9 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
-import { Laptop, Monitor, Smartphone } from 'lucide-react';
+import { Laptop, Monitor, Smartphone, FolderOpen, Captions, History } from 'lucide-react';
 import { RELEASE_REPO, RELEASE_VERSION, RELEASES_API, RELEASES_PAGE, artifactNames, latestDownloadUrl } from './release.mjs';
 import '@fontsource-variable/inter-tight';
+import '@fontsource-variable/geist';
 import './site.css';
 
 type Platform = 'mac' | 'win' | 'ios';
@@ -78,46 +79,71 @@ function Site() {
 
   return (
     <div className="site">
+      <a className="skip-link" href="#main">Skip to content</a>
       <header className="site-header">
-        <a className="brand" href={homeHref}>Videe</a>
+        <a className="brand" href={homeHref} aria-label="Videe home">
+          <img src="./icon.png" width="32" height="32" alt="" /><span translate="no">Videe</span>
+        </a>
         <nav className="site-nav" aria-label="Primary">
-          <a href={`https://github.com/${RELEASE_REPO}`} rel="noreferrer">GitHub</a>
-          <a href={playerHref}>Web</a>
-          <a className="nav-download" href={href}>Download</a>
+          <a href="#features">Features</a>
+          <a href={playerHref}>Player</a>
+          <a className="nav-download" href="#downloads">Download</a>
         </nav>
       </header>
 
-      <main>
-        <section className="hero">
-          <h1>Videe</h1>
-          <p className="spec">Local video player</p>
-          <p className="platforms">
-            {PLATFORMS.map((platform, index) => (
-              <span key={platform.id}>
-                {index > 0 ? <span className="sep"> · </span> : null}
-                {platform.id === os
-                  ? <span className="is-here" aria-current="true">{platform.label}</span>
-                  : <a href={files[platform.id].available ? files[platform.id].href : RELEASES_PAGE}>{platform.label}</a>}
-              </span>
-            ))}
-          </p>
-          <a className="hero-download" href={href}>
-            <Icon size={18} strokeWidth={2} />
-            <span>{currentFile.available ? current.cta : 'View releases'}</span>
-          </a>
-          {currentFile.size ? <p className="also">{currentFile.size}</p> : null}
+      <main id="main" tabIndex={-1}>
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="hero-copy">
+            <p className="spec">Local video player</p>
+            <h1 id="hero-title">Videe</h1>
+            <div className="hero-actions">
+              <a className="hero-download" href={href}>
+                <Icon size={19} strokeWidth={1.8} aria-hidden="true" />
+                <span>{currentFile.available ? current.cta : 'View releases'}</span>
+              </a>
+              <a className="hero-web" href={playerHref}>Web player</a>
+            </div>
+            <p className="release-note">macOS, Windows & iOS<span>Version {version}{currentFile.size ? ` · ${currentFile.size}` : ''}</span></p>
+          </div>
+          <div className="hero-art" aria-hidden="true">
+            <div className="icon-stage"><img src="./icons/icon-rounded.png" width="512" height="512" alt="" fetchPriority="high" /></div>
+          </div>
+          <div className="hero-footnote"><span>On your device</span><span>No account</span></div>
+        </section>
+
+        <section className="features" id="features" aria-labelledby="features-title">
+          <div className="section-heading"><h2 id="features-title">Features</h2></div>
+          <div className="feature-list">
+            <article><FolderOpen aria-hidden="true" size={26} strokeWidth={1.5} /><h3>Library</h3><p>Local files, search, and favorites.</p></article>
+            <article><History aria-hidden="true" size={26} strokeWidth={1.5} /><h3>Resume</h3><p>Continue from the last position.</p></article>
+            <article><Captions aria-hidden="true" size={26} strokeWidth={1.5} /><h3>Subtitles</h3><p>SRT and WebVTT.</p></article>
+          </div>
+        </section>
+
+        <section className="downloads" id="downloads" aria-labelledby="downloads-title">
+          <div className="section-heading"><div><h2 id="downloads-title">Download</h2></div><a className="text-link" href={RELEASES_PAGE}>Release notes</a></div>
+          <div className="download-list">
+            {PLATFORMS.map(platform => {
+              const PlatformIcon = platform.icon;
+              const file = files[platform.id];
+              return <article key={platform.id} className="download-option">
+                <PlatformIcon size={28} strokeWidth={1.5} aria-hidden="true" />
+                <h3>{platform.label}</h3>
+                <p>{platform.id === 'mac' ? '.dmg' : platform.id === 'win' ? '.exe' : '.ipa'}</p>
+                <a className="platform-download" href={file.available ? file.href : RELEASES_PAGE}>{file.available ? platform.cta : `View ${platform.label} releases`}</a>
+                {file.size ? <span className="file-size">{file.size}</span> : null}
+              </article>;
+            })}
+          </div>
+          <p className="download-help"><a href={playerHref}>Web player</a> · <a href={`https://github.com/${RELEASE_REPO}#readme`} rel="noreferrer">Setup</a></p>
         </section>
       </main>
 
       <footer className="site-footer">
-        <a className="brand" href={homeHref}>
-          <img src="./icon.png" alt="" />
-          <span>Videe</span>
-          <small>{version}</small>
-        </a>
+        <a className="brand" href={homeHref}><span>Videe</span><small>{version}</small></a>
         <nav aria-label="Footer">
           <a href={`https://github.com/${RELEASE_REPO}`} rel="noreferrer">GitHub</a>
-          <a href={playerHref}>Web</a>
+          <a href={playerHref}>Web player</a>
           <a href={RELEASES_PAGE} rel="noreferrer">Releases</a>
           <a href="./altstore.json" title="AltStore source">AltStore</a>
         </nav>

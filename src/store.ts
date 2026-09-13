@@ -1,4 +1,4 @@
-export interface MediaItem { id: string; name: string; originalName?: string; size: number; type: string; added: number; duration: number; position: number; favorite: boolean; lastPlayed: number; thumbnail?: string; thumbnailVersion?: number; blob?: Blob; native?: boolean; sessionUrl?: string }
+export interface MediaItem { id: string; name: string; originalName?: string; size: number; type: string; added: number; duration: number; position: number; favorite: boolean; lastPlayed: number; loopA?: number; loopB?: number; thumbnail?: string; thumbnailVersion?: number; blob?: Blob; native?: boolean; sessionUrl?: string }
 
 // Media bytes are stored once. Library reads and progress updates only touch metadata.
 const storedBlobs = new Set<string>();

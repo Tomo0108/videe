@@ -15,11 +15,19 @@
       "appPermissions": {},
       "versions": [
         {
+          "version": "0.1.2",
+          "buildVersion": "3",
+          "date": "2026-09-13",
+          "localizedDescription": "Folders, loop ranges, segment removal, and a calmer library.",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/latest/download/Videe-0.1.2-ios.ipa",
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "0.1.1",
           "buildVersion": "2",
           "date": "2026-09-12",
           "localizedDescription": "UI cleanup and library tools.",
-          "downloadURL": "https://github.com/Tomo0108/videe/releases/latest/download/Videe-0.1.1-ios.ipa",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.1/Videe-0.1.1-ios.ipa",
           "minOSVersion": "15.0"
         },
         {
