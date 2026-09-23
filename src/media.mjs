@@ -1,4 +1,6 @@
-export const EXTENSIONS = ['mp4','m4v','mov','webm','mkv','avi','wmv','flv','mpeg','mpg','m2ts','mts','ts','3gp','ogv','vob','mxf','hevc','av1'];
+// Chromium plays many of these directly; the desktop app can convert the rest
+// to a broadly compatible MP4 when its codecs are not supported by the player.
+export const EXTENSIONS = ['mp4','m4v','mov','qt','webm','mkv','avi','divx','wmv','asf','flv','f4v','mpeg','mpg','m2ts','mts','ts','3gp','3g2','ogv','vob','mxf','dv','hevc','av1','rm','rmvb'];
 export function isVideo(name, type = '') { return type.startsWith('video/') || EXTENSIONS.includes(name.split('.').pop()?.toLowerCase()); }
 export async function filesFromDirectory(handle, acc = [], depth = 0, prefix = handle.name || '') {
   if (acc.length >= 1000 || depth > 8) return acc;

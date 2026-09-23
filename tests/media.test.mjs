@@ -37,7 +37,7 @@ test('embedded text subtitle streams are listed and image tracks are skipped', (
   ]);
   assert.equal(subtitleLabel('', 2), 'Subtitle 3');
 });
-test('video import is case insensitive and excludes unrelated files', () => { assert.equal(isVideo('Film.MKV'),true); assert.equal(isVideo('film.odd','video/custom'),true); assert.equal(isVideo('note.txt'),false); assert.equal(sizeLabel(1024**3),'1.0 GB'); });
+test('video import accepts supported containers case insensitively and excludes unrelated files', () => { assert.equal(isVideo('Film.MKV'),true); assert.equal(isVideo('archive.RMVB'),true); assert.equal(isVideo('cam.3g2'),true); assert.equal(isVideo('film.odd','video/custom'),true); assert.equal(isVideo('note.txt'),false); assert.equal(sizeLabel(1024**3),'1.0 GB'); });
 test('browser folder walk collects nested videos and skips notes', async () => {
   const handle = {
     async *values() {

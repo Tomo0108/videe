@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('videe', {
   platform: process.platform,
+  pickFiles: () => ipcRenderer.invoke('pick-files'),
   importFiles: files => ipcRenderer.invoke('import-paths', files.map(file => webUtils.getPathForFile(file)).filter(Boolean)),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   getSource: id => ipcRenderer.invoke('get-source', id),

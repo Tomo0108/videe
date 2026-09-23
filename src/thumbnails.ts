@@ -14,13 +14,15 @@ export function thumbnailSeekTime(duration: number) {
 export function captureFrame(video:HTMLVideoElement):Pick<MediaItem,'thumbnail'|'thumbnailVersion'> {
   if(!video.videoWidth || !video.videoHeight) throw new Error('No decoded video frame');
   const canvas=document.createElement('canvas');
-  const scale=Math.min(1,1600/Math.max(video.videoWidth,video.videoHeight));
+  // Capturing a 4K frame into a large JPEG blocks the renderer and can interrupt
+  // playback. Library previews do not need more than a compact display-sized image.
+  const scale=Math.min(1,640/Math.max(video.videoWidth,video.videoHeight));
   canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
   canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
   const context=canvas.getContext('2d')!;
   context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';
   context.drawImage(video,0,0,canvas.width,canvas.height);
-  return {thumbnail:canvas.toDataURL('image/jpeg',.94),thumbnailVersion:THUMBNAIL_VERSION};
+  return {thumbnail:canvas.toDataURL('image/jpeg',.82),thumbnailVersion:THUMBNAIL_VERSION};
 }
 function abortError() {
   return new DOMException('Aborted', 'AbortError');

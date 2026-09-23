@@ -11,11 +11,11 @@ try {
   assert.equal(await page.locator('.library-section').count(),1);
   assert.equal(await page.getByRole('heading',{name:'No videos',exact:true}).count(),1);
   assert.equal(await page.getByRole('button',{name:'Open folder',exact:true}).count(),1);
-  assert.equal(await page.getByRole('button',{name:'Open video',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Open video',exact:true}).count(),1);
   assert.equal(await page.getByRole('slider').count(),0);
   assert.equal(await page.locator('.sidebar,.queue-panel,.filter-row,.playback-bar').count(),0);
   await page.screenshot({path:'/tmp/videe-redesign-empty.png',fullPage:true});
-  await page.locator('input[type=file]').first().setInputFiles(resolve('tests/fixtures/sample.mp4'));
+  await page.locator('input.file-input').setInputFiles(resolve('tests/fixtures/sample.mp4'));
   await page.waitForFunction(()=>{const video=document.querySelector('video');return video&&video.readyState>=2&&video.currentTime>0.2;});
   await page.locator('.transport-play').click();
   await page.waitForFunction(()=>document.querySelector('video').paused);

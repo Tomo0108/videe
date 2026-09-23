@@ -8,7 +8,7 @@ const page = await app.firstWindow(); const errors=[];page.on('pageerror',e=>err
 try {
   await page.getByRole('button',{name:'Open folder',exact:true}).waitFor();
   await app.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},resolve('tests/fixtures/legacy.avi'));
-  await page.getByRole('button',{name:'Open folder',exact:true}).click();
+  await page.getByRole('button',{name:'Open video',exact:true}).click();
   await page.getByRole('button',{name:'Convert & play',exact:true}).waitFor();
   await page.getByRole('button',{name:'Convert & play',exact:true}).click();
   await page.waitForFunction(()=>{const v=document.querySelector('video');return v&&v.currentSrc.includes("converted=")&&!v.error&&v.readyState>=2&&v.currentTime>0.2;},null,{timeout:60000});
@@ -22,5 +22,5 @@ try {
   await page.locator('.video-title').click();
   await page.waitForFunction(()=>{const v=document.querySelector('video');return v&&v.readyState>=2;});
   assert.deepEqual(errors,[]);
-  console.log('PASS: native AVI selection, unsupported-codec detection, FFmpeg conversion, real playback, range seek, registry persistence, isolated renderer.');
+  console.log('PASS: native file selection, unsupported-codec detection, FFmpeg conversion, real playback, range seek, registry persistence, isolated renderer.');
 } catch(error) { console.error('Page errors:',errors);  console.error((await page.locator('body').innerText()).slice(0,1500)); await page.screenshot({path:'/tmp/videe-desktop-failure.png'}); throw error; } finally { await app.close(); await rm(userData,{recursive:true,force:true}); }

@@ -95,6 +95,11 @@ app.whenReady().then(async () => {
     if (url.hostname !== 'media' || !entry) return new Response('Not found', { status: 404 });
     try { return await mediaResponse(request, entry.converted || entry.path); } catch { return new Response('File unavailable', { status: 404 }); }
   });
+  register('pick-files', async () => {
+    const result = await dialog.showOpenDialog(win, { title: 'Open videos', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Videos', extensions: ['mp4', 'm4v', 'mov', 'qt', 'webm', 'mkv', 'avi', 'divx', 'wmv', 'asf', 'flv', 'f4v', 'mpeg', 'mpg', 'm2ts', 'mts', 'ts', '3gp', '3g2', 'ogv', 'vob', 'mxf', 'dv', 'hevc', 'av1', 'rm', 'rmvb'] }] });
+    if (result.canceled) return null;
+    return importPaths(result.filePaths);
+  });
   register('pick-folder', async () => {
     const result = await dialog.showOpenDialog(win, { title: 'Open folder', properties: ['openDirectory'] });
     if (result.canceled || !result.filePaths[0]) return null;

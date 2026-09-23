@@ -60,9 +60,9 @@ export default function App() {
   const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
   const [embeddedTracks,setEmbeddedTracks] = useState<{index:number;label:string;language:string}[]>([]);
   const [isFullscreen,setIsFullscreen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
+  const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const fileRef = useRef<HTMLInputElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
   const forceResume = useRef(false); const playAfterLoad = useRef(false); const startFromBeginning = useRef(false);
-  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const dragDepth = useRef(0);
+  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const lastPositionPaint = useRef(0); const dragDepth = useRef(0);
   const chromeHide = useRef(0); const videoClick = useRef(0);
   const subtitleStateRef = useRef(subtitle); subtitleStateRef.current = subtitle;
   const active = items.find(item => item.id === activeId);
@@ -127,7 +127,7 @@ export default function App() {
     if(!activeRef.current) queue.current = visibleIds.current;
     if(!queue.current.includes(item.id)) queue.current = [...queue.current, item.id];
     saveProgress(); forceResume.current = resumePlayback; playAfterLoad.current = continuePlayback; startFromBeginning.current = continuePlayback; const sequence = ++openSequence.current;
-    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); lastSave.current = 0;
+    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); lastSave.current = 0; lastPositionPaint.current = 0;
     try {
       let src: string;
       if(item.native && window.videe) src = await window.videe.getSource(item.id);
@@ -184,11 +184,11 @@ export default function App() {
       const named = groups.map(group => ({ name: group.name, ids: group.files.map((file: File) => imported.get(file)).filter((id: string | undefined): id is string => !!id) })).filter(group => group.ids.length);
       if(named.length) fileIntoFolders(named, folderName);
       else if(folderName) fileIntoFolder(folderName, folderIds);
-      else fileIntoScope(importedIds);
+      else fileIntoScope(folderIds);
       if(transient) notify('Storage is full. Some videos are available for this session only.');
       else if(invalid) notify(`Skipped ${invalid} non-video files.`);
       else if(!count) notify(first ? 'This video is already in your library.' : 'No videos in this folder.');
-      if(first && !activeRef.current && !folderName) { visibleIds.current = itemsRef.current.map(i=>i.id); await openItem(first); }
+      if(first && !activeRef.current && !folderName && !scope) { visibleIds.current = itemsRef.current.map(i=>i.id); await openItem(first); }
     } finally { setBusy(false); }
   };
   const addNativeRecords = async (picked: MediaItem[], folderName = '', folders: {name:string;ids:string[]}[] = []) => {
@@ -198,8 +198,8 @@ export default function App() {
     const named = folders.filter(folder => folder.name && folder.ids.length);
     if(named.length) fileIntoFolders(named, folderName);
     else if(folderName) fileIntoFolder(folderName, picked.map(item=>item.id));
-    else fileIntoScope(fresh.map(item=>item.id));
-    if(picked[0] && !activeRef.current && !folderName) { visibleIds.current = next.map(i=>i.id); await openItem(next.find(i=>i.id===picked[0].id)!); }
+    else fileIntoScope(picked.map(item=>item.id));
+    if(picked[0] && !activeRef.current && !folderName && !scope) { visibleIds.current = next.map(i=>i.id); await openItem(next.find(i=>i.id===picked[0].id)!); }
   };
   const pickFolder = async () => {
     if(busy || !ready || controlsLocked) return;
@@ -215,6 +215,21 @@ export default function App() {
       return;
     }
     folderRef.current?.click();
+  };
+  const pickFiles = async () => {
+    if(busy || !ready || controlsLocked) return;
+    if(window.videe) {
+      setBusy(true);
+      try {
+        const picked = await window.videe.pickFiles();
+        if(picked === null) return;
+        if(!picked.length) { notify('No supported videos selected.'); return; }
+        await addNativeRecords(picked);
+      } catch { notify('Could not add videos.'); }
+      finally { setBusy(false); }
+      return;
+    }
+    fileRef.current?.click();
   };
   const bindFolderInput = useCallback((node: HTMLInputElement | null) => {
     folderRef.current = node;
@@ -481,7 +496,7 @@ export default function App() {
     onDragLeave={e => { e.preventDefault(); if(--dragDepth.current <= 0) { dragDepth.current=0; setDragging(false); } }}
     onDrop={e => { e.preventDefault(); dragDepth.current=0; setDragging(false); void importFiles(Array.from(e.dataTransfer.files)); }}>
     <a className="skip-link" href="#main">Skip to content</a>
-    <input className="file-input" type="file" accept="video/*,.mkv,.avi,.wmv,.flv,.mpeg,.mpg,.m2ts,.mts,.ts,.vob,.mxf,.hevc,.av1" multiple hidden onChange={e => { void importFiles(Array.from(e.target.files || [])); e.target.value=''; }}/>
+    <input ref={fileRef} className="file-input" type="file" accept="video/*,.mkv,.avi,.divx,.wmv,.asf,.flv,.f4v,.mpeg,.mpg,.m2ts,.mts,.ts,.3gp,.3g2,.ogv,.vob,.mxf,.dv,.hevc,.av1,.rm,.rmvb" multiple hidden onChange={e => { void importFiles(Array.from(e.target.files || [])); e.target.value=''; }}/>
     <input ref={bindFolderInput} className="folder-input" type="file" multiple hidden onChange={e => { const files = Array.from(e.target.files || []); e.target.value=''; if(!files.length) { notify('No videos in this folder.'); return; } void importFiles(files); }}/>
     <input ref={subtitleRef} type="file" accept=".srt,.vtt" hidden onChange={e => { void importSubtitle(e.target.files?.[0]); e.target.value=''; }}/>
 
@@ -489,7 +504,7 @@ export default function App() {
       {active ? <div className="player-heading"><IconButton icon={ArrowLeft} label="Back to library" onClick={closePlayer}/><h1 title={active.name}>{active.name}</h1></div>
         : <div className="brand"><img src="./icon.png" width="30" height="30" alt=""/><span>Videe</span></div>}
       <div className="header-actions">
-        {!active && <button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button>}
+        {!active && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
         <IconButton icon={Settings2} label="Settings" onClick={() => setModal('settings')}/>
       </div>
     </header>
@@ -500,7 +515,7 @@ export default function App() {
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
-            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}setPosition(t);if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
+            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}if(Math.abs(t-lastPositionPaint.current)>=.25){lastPositionPaint.current=t;setPosition(t);}if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
             {loading && !error && conversion===null && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}
             {conversion!==null && jobKind==='cut' && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>Removing segment · {timeLabel(conversion)}</span><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</button></div>}
             {error && <div className="player-error"><Film size={28} aria-hidden="true"/><h2>Can’t play</h2>

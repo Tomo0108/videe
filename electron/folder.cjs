@@ -1,7 +1,7 @@
 const { readdir } = require('node:fs/promises');
 const { basename, extname, join, relative } = require('node:path');
 
-const VIDEO_EXT = new Set(['mp4','m4v','mov','webm','mkv','avi','wmv','flv','mpeg','mpg','m2ts','mts','ts','3gp','ogv','vob','mxf','hevc','av1']);
+const VIDEO_EXT = new Set(['mp4','m4v','mov','qt','webm','mkv','avi','divx','wmv','asf','flv','f4v','mpeg','mpg','m2ts','mts','ts','3gp','3g2','ogv','vob','mxf','dv','hevc','av1','rm','rmvb']);
 
 async function collectVideoPaths(root, { maxFiles = 1000, maxDepth = 8 } = {}) {
   const acc = [];

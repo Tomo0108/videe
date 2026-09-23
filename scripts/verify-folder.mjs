@@ -34,6 +34,10 @@ try {
   assert.equal(await page.locator('.video-card').count(), 2);
   await page.locator('.organization summary[aria-label="Collection"]').click();
   await page.locator('.organization .choice-options').getByRole('button', { name: basename(root), exact: true }).click();
+  const videoChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Open video', exact: true }).click();
+  await (await videoChooserPromise).setFiles(resolve('tests/fixtures/sample.mp4'));
+  await page.waitForFunction(() => document.querySelectorAll('.video-card').length === 2);
   await page.getByRole('button', { name: 'Duration', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: 'Duration', exact: true }).getAttribute('aria-sort'), 'descending');
   await page.reload();
@@ -43,7 +47,7 @@ try {
   await page.getByRole('checkbox', { name: 'Select Inside.mp4', exact: true }).check();
   await page.locator('.library-selection .choice-menu > summary').click();
   await page.locator('.library-selection .choice-options').getByRole('button', { name: 'Remove from folder', exact: true }).click();
-  await page.getByText('Empty collection').waitFor();
+  await page.getByRole('button', { name: 'Play sample.mp4', exact: true }).waitFor();
   await page.locator('.organization summary[aria-label="Collection"]').click();
   await page.locator('.organization .choice-options').getByRole('button', { name: 'nested', exact: true }).click();
   await page.getByRole('button', { name: 'Delete folder', exact: true }).click();
@@ -51,10 +55,10 @@ try {
   await page.locator('dialog.modal').waitFor({ state: 'detached' });
   await page.locator('.organization summary[aria-label="Collection"]').click();
   await page.locator('.organization .choice-options').getByRole('button', { name: 'All collections', exact: true }).click();
-  assert.equal(await page.locator('.video-card').count(), 1);
-  assert.equal(await page.locator('.video-title').innerText(), 'Inside');
+  assert.equal(await page.locator('.video-card').count(), 2);
+  assert.deepEqual((await page.locator('.video-title').allTextContents()).sort(), ['Inside', 'sample']);
   await page.locator('.library-selection').getByRole('button', { name: 'Select all', exact: true }).click();
-  await page.getByText('1 selected').waitFor();
+  await page.getByText('2 selected').waitFor();
   await page.locator('.library-selection').getByRole('button', { name: 'Remove from library', exact: true }).click();
   await page.locator('dialog.modal').getByRole('button', { name: 'Remove', exact: true }).click();
   await page.locator('dialog.modal').waitFor({ state: 'detached' });
