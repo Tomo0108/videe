@@ -178,7 +178,9 @@ svg { flex-shrink: 0; }
 .player-view { max-width: none; width: 100%; flex: 1; min-height: 0; padding: 8px 16px 16px; margin: 0; display: flex; }
 .player-stage { display: flex; flex-direction: column; flex: 1; width: 100%; height: auto; min-height: 220px; position: relative; background: #0a0a0a; border-radius: 18px; overflow: hidden; color: #f2f4f8; box-shadow: 0 16px 48px oklch(0 0 0 / 0.28); }
 .video-surface { position: absolute; inset: 0; }
-.video-surface video { width: 100%; height: 100%; display: block; object-fit: contain; cursor: pointer; }
+.video-surface video { width: 100%; height: 100%; display: block; object-fit: contain; cursor: pointer; transform-origin: center; will-change: transform; }
+.video-surface video[data-zoomed] { cursor: grab; touch-action: none; }
+.video-surface video[data-zoomed]:active { cursor: grabbing; }
 .video-surface video::cue { background: #0009; color: #fff; font-size: clamp(15px, 2.6vh, 36px); }
 .player-controls { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2; max-width: 1080px; width: calc(100% - 32px); padding: 10px 18px 14px; margin: 0; border-radius: 14px; background: #171717f2; border: 1px solid #ffffff14; box-shadow: inset 0 1px 0 #ffffff0b; transition: opacity var(--duration-fade) var(--ease-out); }
 .player-stage[data-chrome=off] .player-controls { opacity: 0; pointer-events: none; }

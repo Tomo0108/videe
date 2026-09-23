@@ -1,7 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, Clock3, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Heart, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, ZoomIn } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -68,9 +68,10 @@ export default function App() {
   const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
   const [embeddedTracks,setEmbeddedTracks] = useState<{index:number;label:string;language:string}[]>([]);
   const [isFullscreen,setIsFullscreen] = useState(false);
+  const [videoZoom,setVideoZoom] = useState(1); const [videoPan,setVideoPan] = useState({x:0,y:0});
   const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const fileRef = useRef<HTMLInputElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
   const forceResume = useRef(false); const playAfterLoad = useRef(false); const startFromBeginning = useRef(false);
-  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const lastPositionPaint = useRef(0); const gpuStatusRequest = useRef(false); const dragDepth = useRef(0);
+  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const lastPositionPaint = useRef(0); const gpuStatusRequest = useRef(false); const panDrag = useRef<{x:number;y:number;startX:number;startY:number}|null>(null); const panWasDragged = useRef(false); const dragDepth = useRef(0);
   const chromeHide = useRef(0); const videoClick = useRef(0);
   const subtitleStateRef = useRef(subtitle); subtitleStateRef.current = subtitle;
   const active = items.find(item => item.id === activeId);
@@ -144,7 +145,7 @@ export default function App() {
     if(!activeRef.current) queue.current = visibleIds.current;
     if(!queue.current.includes(item.id)) queue.current = [...queue.current, item.id];
     saveProgress(); forceResume.current = resumePlayback; playAfterLoad.current = continuePlayback; startFromBeginning.current = continuePlayback; const sequence = ++openSequence.current;
-    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); lastSave.current = 0; lastPositionPaint.current = 0;
+    setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); setVideoZoom(1); setVideoPan({x:0,y:0}); lastSave.current = 0; lastPositionPaint.current = 0;
     try {
       let src: string;
       if(item.native && window.videe) src = await window.videe.getSource(item.id);
@@ -259,6 +260,29 @@ export default function App() {
   const seek = useCallback((seconds: number) => { const video = videoRef.current; if(video && Number.isFinite(video.duration)) { video.currentTime = clampTime(seconds,video.duration); setPosition(video.currentTime); } }, []);
   const nextVideo = useCallback((offset: number) => { const index = queue.current.indexOf(activeRef.current || ''); const item = itemsRef.current.find(i => i.id === queue.current[index+offset]); if(item) void openItem(item); }, [openItem]);
   const fullscreen = useCallback(async () => { const stage = stageRef.current; if(!stage || !activeRef.current) return; try { if(document.fullscreenElement) await document.exitFullscreen(); else if(stage.requestFullscreen) await stage.requestFullscreen(); else (videoRef.current as HTMLVideoElement & {webkitEnterFullscreen?:()=>void})?.webkitEnterFullscreen?.(); } catch { notify('Full screen is not available on this device.'); } }, [notify]);
+  const clampVideoPan = useCallback((x:number, y:number, zoom:number) => {
+    const stage = stageRef.current;
+    if (!stage || zoom <= 1) return {x:0,y:0};
+    const maxX = stage.clientWidth * (zoom - 1) / 2;
+    const maxY = stage.clientHeight * (zoom - 1) / 2;
+    return {x:Math.max(-maxX,Math.min(maxX,x)),y:Math.max(-maxY,Math.min(maxY,y))};
+  }, []);
+  const resetVideoView = useCallback(() => { setVideoZoom(1); setVideoPan({x:0,y:0}); }, []);
+  const fillScreen = useCallback(async () => {
+    const stage = stageRef.current; const video = videoRef.current;
+    if (!stage || !video || !video.videoWidth || !video.videoHeight) return;
+    try {
+      if (!document.fullscreenElement) {
+        if (stage.requestFullscreen) await stage.requestFullscreen();
+        else (video as HTMLVideoElement & {webkitEnterFullscreen?:()=>void}).webkitEnterFullscreen?.();
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const contain = Math.min(stage.clientWidth / video.videoWidth, stage.clientHeight / video.videoHeight);
+        const cover = Math.max(stage.clientWidth / video.videoWidth, stage.clientHeight / video.videoHeight);
+        setVideoZoom(Math.max(1,cover / contain)); setVideoPan({x:0,y:0});
+      }));
+    } catch { notify('Full screen is not available on this device.'); }
+  }, [notify]);
   const pictureInPicture = async () => { try { if(document.pictureInPictureElement) await document.exitPictureInPicture(); else if(videoRef.current?.requestPictureInPicture) await videoRef.current.requestPictureInPicture(); else notify('Picture in Picture is not available on this device.'); } catch { notify('Start playback, then try again.'); } };
   const revealChrome = useCallback((hold = false) => {
     setChrome(true);
@@ -267,11 +291,33 @@ export default function App() {
     chromeHide.current = window.setTimeout(() => setChrome(false), 2800);
   }, [playing, error, controlsLocked, modal, cutting]);
   const handleVideoClick = (event: React.MouseEvent<HTMLVideoElement>) => {
+    if (panWasDragged.current) { panWasDragged.current = false; return; }
     if (event.detail > 1) return;
     if (!chrome) { revealChrome(); return; }
     window.clearTimeout(videoClick.current);
     videoClick.current = window.setTimeout(() => { videoClick.current = 0; togglePlay(); }, 220);
   };
+  const handleVideoWheel = (event: React.WheelEvent<HTMLVideoElement>) => {
+    if (!event.ctrlKey) return;
+    event.preventDefault(); revealChrome();
+    setVideoZoom(current => {
+      const next = Math.max(1,Math.min(6,current * (event.deltaY < 0 ? 1.1 : 0.9)));
+      setVideoPan(pan => clampVideoPan(pan.x,pan.y,next));
+      return next;
+    });
+  };
+  const startVideoPan = (event: React.PointerEvent<HTMLVideoElement>) => {
+    if (videoZoom <= 1 || event.button !== 0) return;
+    panDrag.current = {x:videoPan.x,y:videoPan.y,startX:event.clientX,startY:event.clientY}; panWasDragged.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveVideoPan = (event: React.PointerEvent<HTMLVideoElement>) => {
+    const drag = panDrag.current; if (!drag) return;
+    const x = drag.x + event.clientX - drag.startX; const y = drag.y + event.clientY - drag.startY;
+    if (Math.abs(x-drag.x)>2 || Math.abs(y-drag.y)>2) panWasDragged.current = true;
+    setVideoPan(clampVideoPan(x,y,videoZoom));
+  };
+  const endVideoPan = (event: React.PointerEvent<HTMLVideoElement>) => { if (panDrag.current) event.currentTarget.releasePointerCapture(event.pointerId); panDrag.current = null; };
   const handleVideoDoubleClick = (event: React.MouseEvent<HTMLVideoElement>) => {
     event.preventDefault();
     window.clearTimeout(videoClick.current);
@@ -532,7 +578,7 @@ export default function App() {
       {active ? <section className="player-view" aria-label="Video player">
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
-            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}if(Math.abs(t-lastPositionPaint.current)>=.25){lastPositionPaint.current=t;setPosition(t);}if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
+            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}if(Math.abs(t-lastPositionPaint.current)>=.25){lastPositionPaint.current=t;setPosition(t);}if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
             {loading && !error && conversion===null && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}
             {conversion!==null && jobKind==='cut' && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>Removing segment · {timeLabel(conversion)}</span><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</button></div>}
             {error && <div className="player-error"><Film size={28} aria-hidden="true"/><h2>Can’t play</h2>
@@ -567,6 +613,8 @@ export default function App() {
                   <select className="speed-select" aria-label="Playback speed" value={prefs.speed} onChange={e => setPrefs({...prefs,speed:Number(e.target.value)})}>{SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select>
                   <button aria-label="Subtitles" title="Subtitles" className={`caption-button ${subtitle && captions ? 'active' : ''}`} onClick={() => setModal('subtitles')}><Captions size={18} aria-hidden="true"/></button>
                   <IconButton icon={PictureInPicture2} label="Picture in Picture" onClick={() => void pictureInPicture()}/>
+                  <IconButton icon={ZoomIn} label="Fill screen" disabled={!source || !!error} onClick={() => void fillScreen()}/>
+                  {videoZoom>1 && <IconButton icon={RotateCcw} label="Reset video view" onClick={resetVideoView}/>}
                   <IconButton icon={isFullscreen ? Minimize : Maximize} label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => void fullscreen()}/>
                 </div>
               </div>
