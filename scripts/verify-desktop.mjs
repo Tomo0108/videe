@@ -7,6 +7,8 @@ const app = await electron.launch({ args: ['.'], env: {...process.env,VIDEE_TEST
 const page = await app.firstWindow(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try {
   await page.getByRole('button',{name:'Open folder',exact:true}).waitFor();
+  const gpuStatus = await page.evaluate(() => window.videe?.getGpuStatus());
+  assert.equal(typeof gpuStatus?.videoDecode, 'string');
   await app.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},resolve('tests/fixtures/legacy.avi'));
   await page.getByRole('button',{name:'Open video',exact:true}).click();
   await page.getByRole('button',{name:'Convert & play',exact:true}).waitFor();

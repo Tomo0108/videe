@@ -95,6 +95,14 @@ app.whenReady().then(async () => {
     if (url.hostname !== 'media' || !entry) return new Response('Not found', { status: 404 });
     try { return await mediaResponse(request, entry.converted || entry.path); } catch { return new Response('File unavailable', { status: 404 }); }
   });
+  register('get-gpu-status', async () => {
+    const status = await app.getGPUFeatureStatus();
+    return {
+      videoDecode: status.video_decode || 'unknown',
+      gpuCompositing: status.gpu_compositing || 'unknown',
+      rasterization: status.rasterization || 'unknown',
+    };
+  });
   register('pick-files', async () => {
     const result = await dialog.showOpenDialog(win, { title: 'Open videos', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Videos', extensions: ['mp4', 'm4v', 'mov', 'qt', 'webm', 'mkv', 'avi', 'divx', 'wmv', 'asf', 'flv', 'f4v', 'mpeg', 'mpg', 'm2ts', 'mts', 'ts', '3gp', '3g2', 'ogv', 'vob', 'mxf', 'dv', 'hevc', 'av1', 'rm', 'rmvb'] }] });
     if (result.canceled) return null;

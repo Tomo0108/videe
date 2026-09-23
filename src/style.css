@@ -245,6 +245,7 @@ input[type=range]:disabled { opacity: .4; cursor: default; }
 .setting-row > span { min-width: 0; }
 .setting-row small { display: block; font-size: var(--type-callout); font-weight: 400; color: var(--muted); margin-top: 3px; }
 .setting-row:has(small) { padding: 10px 0; }
+.diagnostic-details { display: grid; gap: 4px; padding: 0 0 12px; color: var(--muted); font-size: var(--type-callout); }
 input[role=switch] { appearance: none; width: 36px; height: 22px; border-radius: 999px; background: #a0a8b580; position: relative; cursor: pointer; flex-shrink: 0; margin: 0; border: 1px solid var(--line); transition: background .28s var(--ease-out), box-shadow var(--duration-fast) var(--ease-out); }
 input[role=switch]::after { content: ''; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px #0003; transition: transform .4s var(--ease-spring), width .16s var(--ease-out); }
 input[role=switch]:active::after { width: 19px; }

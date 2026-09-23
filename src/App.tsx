@@ -20,6 +20,7 @@ function ShortcutKeys({ keys }: { keys: string[] }) {
 }
 
 type View = 'all' | 'favorites' | 'continue';
+type GpuStatus = { videoDecode: string; gpuCompositing: string; rasterization: string };
 const SORT_COLUMNS: { id: LibrarySort; label: string }[] = [
   { id: 'name', label: 'Name' },
   { id: 'duration', label: 'Duration' },
@@ -29,6 +30,12 @@ const SORT_COLUMNS: { id: LibrarySort; label: string }[] = [
 function playedLabel(item: MediaItem) {
   if (!item.lastPlayed) return '—';
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(item.lastPlayed);
+}
+function gpuStatusLabel(value: string) {
+  if (['enabled', 'enabled_on', 'enabled_force'].includes(value)) return 'Hardware accelerated';
+  if (['disabled_software', 'unavailable_software'].includes(value)) return 'Software fallback';
+  if (value === 'unknown') return 'Unavailable';
+  return 'Disabled or unavailable';
 }
 function getPreferences(): Preferences { try { return normalizePreferences(JSON.parse(localStorage.getItem('videe-preferences') || '{}')); } catch { return normalizePreferences(null); } }
 function LoopRangeIcon({ size = 18, color, absoluteStrokeWidth: _absoluteStrokeWidth, strokeWidth: _strokeWidth, ...props }: LucideProps) {
@@ -55,6 +62,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null); const [source, setSource] = useState(''); const [playing,setPlaying] = useState(false); const [position,setPosition] = useState(0); const [duration,setDuration] = useState(0);
   const [muted,setMuted] = useState(false); const [error,setError] = useState(''); const [loading,setLoading] = useState(false); const [busy,setBusy] = useState(false); const [conversion,setConversion] = useState<number | null>(null);
   const [prefs,setPrefs] = useState<Preferences>(getPreferences); const [modal,setModal] = useState<'settings'|'subtitles'|'cut'|null>(null); const [deleteIds,setDeleteIds] = useState<string[]|null>(null); const [toast,setToast] = useState(''); const [dragging,setDragging] = useState(false);
+  const [gpuStatus,setGpuStatus] = useState<GpuStatus|null>(null); const [gpuLoading,setGpuLoading] = useState(false);
   const [ab, setAb] = useState<{a:number|null;b:number|null}>({a:null,b:null});
   const [chrome, setChrome] = useState(true);
   const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
@@ -62,12 +70,21 @@ export default function App() {
   const [isFullscreen,setIsFullscreen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const fileRef = useRef<HTMLInputElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
   const forceResume = useRef(false); const playAfterLoad = useRef(false); const startFromBeginning = useRef(false);
-  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const lastPositionPaint = useRef(0); const dragDepth = useRef(0);
+  const urls = useRef(new Map<string,string>()); const openSequence = useRef(0); const lastSave = useRef(0); const lastPositionPaint = useRef(0); const gpuStatusRequest = useRef(false); const dragDepth = useRef(0);
   const chromeHide = useRef(0); const videoClick = useRef(0);
   const subtitleStateRef = useRef(subtitle); subtitleStateRef.current = subtitle;
   const active = items.find(item => item.id === activeId);
   const notify = useCallback((text: string) => setToast(text), []);
+  const refreshGpuStatus = useCallback(async () => {
+    if (!window.videe?.getGpuStatus || gpuStatusRequest.current) return;
+    gpuStatusRequest.current = true;
+    setGpuLoading(true);
+    try { setGpuStatus(await window.videe.getGpuStatus()); }
+    catch { setGpuStatus(null); notify('Could not read graphics diagnostics.'); }
+    finally { gpuStatusRequest.current = false; setGpuLoading(false); }
+  }, [notify]);
   useEffect(() => { readLibrary().then(data => setItems(data)).catch(() => notify('Could not load your library. Check browser storage permissions.')).finally(() => setReady(true)); return () => { urls.current.forEach(url => URL.revokeObjectURL(url)); }; }, [notify]);
+  useEffect(() => { if (modal === 'settings' && window.videe?.platform === 'win32') void refreshGpuStatus(); }, [modal, refreshGpuStatus]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 5500); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => { try { localStorage.setItem('videe-preferences', JSON.stringify(prefs)); } catch { notify('Could not save preferences. Check available storage.'); } if(videoRef.current) { videoRef.current.playbackRate = prefs.speed; videoRef.current.volume = prefs.volume; } }, [prefs, notify]);
   useEffect(() => window.videe?.onConversionProgress(({id,seconds}) => { if(id === activeRef.current) setConversion(seconds); }), []);
@@ -595,6 +612,7 @@ export default function App() {
       <label className="setting-row"><span>Autoplay next</span><input type="checkbox" role="switch" aria-label="Autoplay next" checked={prefs.autoAdvance} onChange={e=>setPrefs({...prefs,autoAdvance:e.target.checked})}/></label>
       <label className="setting-row"><span>Repeat</span><select aria-label="Repeat" value={prefs.repeat} onChange={e=>setPrefs({...prefs,repeat:e.target.value as Preferences['repeat']})}><option value="off">Off</option><option value="one">Repeat one</option><option value="all">Repeat all</option></select></label>
       </div>
+      {window.videe?.platform === 'win32' && <section className="settings-section" aria-label="Video diagnostics"><h3>Video diagnostics</h3><div className="settings-group"><div className="setting-row"><span>Video decoding<small>{gpuStatus ? gpuStatusLabel(gpuStatus.videoDecode) : 'Checking graphics support…'}</small></span><button className="secondary-button" disabled={gpuLoading} onClick={() => void refreshGpuStatus()}>{gpuLoading ? 'Checking…' : 'Refresh'}</button></div>{gpuStatus && <div className="diagnostic-details"><span>GPU compositing: {gpuStatusLabel(gpuStatus.gpuCompositing)}</span><span>Rasterization: {gpuStatusLabel(gpuStatus.rasterization)}</span></div>}</div><p className="setting-note">If video decoding falls back to software, update the graphics driver or select the high-performance GPU in Windows.</p></section>}
       {!nativeShell && <a className="setting-action" href={siteHref}>Get the app</a>}
       </section><SecuritySettings/><div className="app-about"><img src="./icon.png" width="46" height="46" alt=""/><div><strong translate="no">Videe</strong><span>Version {appPackage.version}</span></div></div>
       <details className="help-details"><summary>Shortcuts</summary><div className="shortcuts">{([['Play / pause',['space']],['Seek',['left','right']],['Volume',['up','down']],['Jump',['0–9']],['Speed',['[',']']],['Frame',[',','.']],['Full screen',['F']],['Mute',['M']],['Subtitles',['C']],['Exit full screen',['esc']]] as const).map(([label,keys]) => <div key={label}><span>{label}</span><ShortcutKeys keys={[...keys]}/></div>)}</div></details>
