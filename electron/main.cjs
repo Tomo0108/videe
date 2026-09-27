@@ -86,7 +86,8 @@ function playerHtml() {
   return join(dist, 'index.html');
 }
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../dist/icon.png'));
+  // Keep the runtime Dock icon consistent with the rounded icon embedded in the macOS app bundle.
+  if (process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../dist/icons/icon-rounded.png'));
   registryFile = join(app.getPath('userData'), 'library.json'); cacheDir = join(app.getPath('userData'), 'converted');
   await fs.mkdir(cacheDir, { recursive: true });
   try { registry = JSON.parse(await fs.readFile(registryFile, 'utf8')); } catch { registry = {}; }

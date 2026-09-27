@@ -1,13 +1,13 @@
-const CACHE = 'videe-shell-v7';
+const CACHE = 'videe-shell-v8';
 const PRECACHE = [
   './app.html',
   './index.html',
-  './manifest.webmanifest',
+  './manifest.webmanifest?v=2',
   './icon.png',
-  './icons/icon-32.png',
-  './icons/icon-180.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-32.png?v=2',
+  './icons/icon-180.png?v=2',
+  './icons/icon-192.png?v=2',
+  './icons/icon-512.png?v=2'
 ];
 
 self.addEventListener('install', event => {

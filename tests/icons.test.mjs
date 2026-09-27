@@ -16,7 +16,7 @@ test('icons are square and consistent across web and iOS',()=>{
   assert.equal(manifest.short_name,'Videe');
   assert.equal(manifest.display,'standalone');
   for(const entry of manifest.icons) {
-    assert.equal(pngSize(read('public/'+entry.src)).join('x'),entry.sizes);
+    assert.equal(pngSize(read('public/'+entry.src.split('?')[0])).join('x'),entry.sizes);
     assert.equal(entry.purpose,'any');
     assert.doesNotMatch(entry.src,/maskable/);
   }
@@ -25,7 +25,7 @@ test('icons are square and consistent across web and iOS',()=>{
   assert.match(html,/icons\/icon-180\.png/);
   assert.match(html,/apple-mobile-web-app-capable/);
   assert.doesNotMatch(html,/personal cinema|Just press play|apple-touch-icon\.png/);
-  assert.match(read('public/sw.js').toString(),/videe-shell-v7/);
+  assert.match(read('public/sw.js').toString(),/videe-shell-v8/);
 });
 test('native package configuration uses valid multi-resolution icon containers',()=>{
   const config=JSON.parse(read('package.json')).build;
