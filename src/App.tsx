@@ -5,13 +5,13 @@ import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Check, LockKeyholeOpen, LockKe
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
-import { readLibrary, readMediaBlob, renameItems, saveItem, removeItem, type MediaItem } from './store';
+import { readLibrary, readMediaBlob, renameItems, saveItem, savePosition, removeItem, type MediaItem } from './store';
 import { Capacitor } from '@capacitor/core';
 import { isVideo, timeLabel, sizeLabel, toVtt, clampTime, clipLoop, keepSegments } from './media.mjs';
 import {Organization,readCollections,importedName,type Collection} from './organization';
 import {placeInFolders,sourceFolderGroups,sourceFolderName,moveToFolder} from './collections.mjs';
 import {SecuritySettings} from './security';
-import {useThumbnails,captureFrame,THUMBNAIL_VERSION} from './thumbnails';
+import {useThumbnails} from './thumbnails';
 import { compareMedia, DEFAULT_DIR, nextSortPref, readFolderSort, sortKey, writeFolderSort, type LibrarySort } from './library-sort.mjs';
 
 const KEY_LABELS: Record<string, string> = { space: '␣', left: '←', right: '→', up: '↑', down: '↓', esc: 'esc' };
@@ -59,6 +59,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [infoId, setInfoId] = useState<string|null>(null);
   const queue = useRef<string[]>([]); const visibleIds = useRef<string[]>([]);
+  const [minimized, setMinimized] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null); const [source, setSource] = useState(''); const [playing,setPlaying] = useState(false); const [position,setPosition] = useState(0); const [duration,setDuration] = useState(0);
   const [muted,setMuted] = useState(false); const [error,setError] = useState(''); const [loading,setLoading] = useState(false); const [busy,setBusy] = useState(false); const [conversion,setConversion] = useState<number | null>(null);
   const [prefs,setPrefs] = useState<Preferences>(getPreferences); const [modal,setModal] = useState<'settings'|'subtitles'|'cut'|null>(null); const [deleteIds,setDeleteIds] = useState<string[]|null>(null); const [toast,setToast] = useState(''); const [dragging,setDragging] = useState(false);
@@ -75,6 +76,7 @@ export default function App() {
   const chromeHide = useRef(0); const videoClick = useRef(0);
   const subtitleStateRef = useRef(subtitle); subtitleStateRef.current = subtitle;
   const active = items.find(item => item.id === activeId);
+  const watching = !!active && !minimized;
   const notify = useCallback((text: string) => setToast(text), []);
   const refreshGpuStatus = useCallback(async () => {
     if (!window.videe?.getGpuStatus || gpuStatusRequest.current) return;
@@ -129,7 +131,16 @@ export default function App() {
   const fileIntoFolder=(name:string,ids:string[])=>fileIntoFolders(name&&ids.length?[{name,ids}]:[],name);
   const relocate=(ids:string[],dest:string)=>{if(!ids.length)return;if(saveCollections(moveToFolder(collections,ids,dest)))setSelected(current=>current.filter(id=>!ids.includes(id)));};
   const batchRename=async(names:Map<string,string>)=>{await renameItems(names);const next=itemsRef.current.map(i=>names.has(i.id)?{...i,originalName:i.originalName||i.name,name:names.get(i.id)!}:i);itemsRef.current=next;setItems(next);};
-  const saveProgress = useCallback(() => { const video = videoRef.current; if(activeRef.current && video && Number.isFinite(video.currentTime)) updateItem(activeRef.current, {position: video.ended ? 0 : video.currentTime}); }, [updateItem]);
+  const saveProgress = useCallback(() => {
+    const video = videoRef.current; const id = activeRef.current;
+    if (!id || !video || !Number.isFinite(video.currentTime)) return;
+    const position = video.ended ? 0 : video.currentTime;
+    // Persist only a lightweight position record; never serialize thumbnails here.
+    itemsRef.current = itemsRef.current.map(item => item.id === id ? {...item, position} : item);
+    setItems(itemsRef.current);
+    lastSave.current = performance.now();
+    void savePosition(id, position).catch(() => notify('Could not save playback progress.'));
+  }, [notify]);
   const applyEmbedded = useCallback(async (itemId: string, index: number, label: string, sequence: number) => {
     if (!window.videe?.extractSubtitle) return;
     try {
@@ -142,7 +153,9 @@ export default function App() {
   useEffect(() => { const handler = () => { if(document.visibilityState === 'hidden') saveProgress(); }; document.addEventListener('visibilitychange',handler); return () => document.removeEventListener('visibilitychange',handler); }, [saveProgress]);
   const openItem = useCallback(async (item: MediaItem, continuePlayback = false, resumePlayback = false) => {
     if(conversion !== null) { notify('Finish or cancel the current video task before switching.'); return; }
-    if(!activeRef.current) queue.current = visibleIds.current;
+    if(item.id === activeRef.current && !continuePlayback && !resumePlayback) { setMinimized(false); return; }
+    if(!continuePlayback) setMinimized(false);
+    if(!activeRef.current || (minimized && !continuePlayback)) queue.current = visibleIds.current;
     if(!queue.current.includes(item.id)) queue.current = [...queue.current, item.id];
     saveProgress(); forceResume.current = resumePlayback; playAfterLoad.current = continuePlayback; startFromBeginning.current = continuePlayback; const sequence = ++openSequence.current;
     setAb({a:null,b:null}); setLooping(false); setCutting(false); setCut({a:null,b:null}); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); setVideoZoom(1); setVideoPan({x:0,y:0}); lastSave.current = 0; lastPositionPaint.current = 0;
@@ -174,7 +187,7 @@ export default function App() {
         })();
       }
     } catch(e) { if(sequence === openSequence.current) { setError(e instanceof Error ? e.message : 'Could not open this video.'); setLoading(false); } }
-  }, [applyEmbedded,conversion,notify,saveProgress,updateItem]);
+  }, [applyEmbedded,conversion,minimized,notify,saveProgress,updateItem]);
   const importFiles = async (files: File[]) => {
     if(busy || !ready || controlsLocked) return;
     const folderName = sourceFolderName(files);
@@ -365,11 +378,11 @@ export default function App() {
     bind('seekto', details => { if (typeof details.seekTime === 'number') seek(details.seekTime); });
     session.playbackState = playing ? 'playing' : 'paused';
     return () => { (['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward', 'seekto'] as const).forEach(action => bind(action, null)); };
-  }, [active, playing, nextVideo, seek]);
+  }, [active?.id, active?.name, active?.thumbnail, playing, nextVideo, seek]);
   useEffect(() => {
     if (!active || !duration || !('mediaSession' in navigator)) return;
     try { navigator.mediaSession.setPositionState({ duration, playbackRate: prefs.speed, position: clampTime(position, duration) }); } catch { /* Position state is optional. */ }
-  }, [active, duration, position, prefs.speed]);
+  }, [activeId, duration, position, prefs.speed]);
   const loaded = () => {
     const video = videoRef.current; if(!video || !activeId) return;
     const finiteDuration = Number.isFinite(video.duration) ? video.duration : 0;
@@ -448,15 +461,6 @@ export default function App() {
     }
     seek(value);
   };
-  const captureThumbnail = () => {
-    const video = videoRef.current; const id = activeId;
-    if(!video || !id || !video.videoWidth || itemsRef.current.find(i=>i.id===id)?.thumbnailVersion===THUMBNAIL_VERSION) return;
-    const capture = () => {
-      if(video !== videoRef.current || id !== activeRef.current || itemsRef.current.find(i=>i.id===id)?.thumbnailVersion===THUMBNAIL_VERSION) return;
-      try { updateItem(id,captureFrame(video)); } catch { /* Some media origins restrict thumbnail extraction. */ }
-    };
-    if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(capture); else requestAnimationFrame(()=>requestAnimationFrame(capture));
-  };
   const importSubtitle = async (file?: File) => { if(!file) return; try { if(file.size > 5*1024*1024) throw new Error('Choose a subtitle file smaller than 5 MB.'); const text = toVtt(await file.text()); setSubtitle({url:URL.createObjectURL(new Blob([text],{type:'text/vtt'})),name:file.name}); setCaptions(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not load subtitles.'); } };
   const convert = async () => { if(!active?.native || !window.videe) return; setJobKind('convert'); setConversion(0); try { const src = await window.videe.convertVideo(active.id); setError(''); setSource(src); setLoading(true); } catch(e) { notify(e instanceof Error ? e.message : 'Could not convert this video.'); } finally { setConversion(null); } };
   const removeFromLibrary = async (ids: string[]) => {
@@ -531,10 +535,15 @@ export default function App() {
     setViewSlide(layout);
     setPrefs({...prefs, layout});
   };
+  const minimizePlayer = async () => {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    saveProgress(); setItems(itemsRef.current); setControlsLocked(false);
+    setVideoZoom(1); setVideoPan({x:0,y:0}); setMinimized(true); setViewSlide('in');
+  };
   const closePlayer = () => {
     if(conversion !== null) { notify('Cancel the current video task before returning to the library.'); return; }
     saveProgress(); videoRef.current?.pause(); ++openSequence.current;
-    activeRef.current = null; setActiveId(null); setSource(''); setError(''); setLoading(false); setPlaying(false); setSubtitle(null); setEmbeddedTracks([]); setViewSlide('in');
+    activeRef.current = null; setMinimized(false); setItems(itemsRef.current); setActiveId(null); setSource(''); setError(''); setLoading(false); setPlaying(false); setSubtitle(null); setEmbeddedTracks([]); setViewSlide('in');
   };
   const closeMenu = (element: HTMLElement) => element.closest('details')?.removeAttribute('open');
   useEffect(() => {
@@ -553,7 +562,7 @@ export default function App() {
     media.addEventListener('change', syncDark);
     return () => { media.removeEventListener('change', syncDark); reducedMotion.removeEventListener('change', syncMotion); };
   }, [prefs.theme, prefs.motion]);
-  return <div className={`app-shell ${active ? 'watching' : 'browsing'} ${window.videe?.platform === 'darwin' ? 'native-mac' : ''}`} 
+  return <div className={`app-shell ${watching ? 'watching' : 'browsing'} ${window.videe?.platform === 'darwin' ? 'native-mac' : ''}`}
     onDragEnter={e => { e.preventDefault(); if(controlsLocked)return; if(e.dataTransfer.types.includes('Files')) { dragDepth.current++; setDragging(true); } }}
     onDragOver={e => e.preventDefault()}
     onDragLeave={e => { e.preventDefault(); if(--dragDepth.current <= 0) { dragDepth.current=0; setDragging(false); } }}
@@ -564,21 +573,21 @@ export default function App() {
     <input ref={subtitleRef} type="file" accept=".srt,.vtt" hidden onChange={e => { void importSubtitle(e.target.files?.[0]); e.target.value=''; }}/>
 
     <header className="app-header" inert={controlsLocked}>
-      {active ? <div className="player-heading"><IconButton icon={ArrowLeft} label="Back to library" onClick={closePlayer}/><h1 title={active.name}>{active.name}</h1></div>
+      {watching ? <div className="player-heading"><IconButton icon={ArrowLeft} label="Back to library" onClick={() => void minimizePlayer()}/><h1 title={active.name}>{active.name}</h1></div>
         : <div className="brand"><img src="./icon.png" width="30" height="30" alt=""/><span>Videe</span></div>}
       <div className="header-actions">
-        {!active && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
+        {!watching && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
         <IconButton icon={Settings2} label="Settings" onClick={() => setModal('settings')}/>
       </div>
     </header>
 
-    {!active && <aside className="library-sidebar"><nav aria-label="Library navigation" data-selected={scope?undefined:view}><span className="nav-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-label={label} title={label} aria-pressed={view===id&&!scope} className={view===id&&!scope?'selected':''} onClick={()=>selectView(id)}><Icon size={20} aria-hidden="true"/></button>)}</nav></aside>}
+    {!watching && <aside className="library-sidebar"><nav aria-label="Library navigation" data-selected={scope?undefined:view}><span className="nav-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon}) => <button key={id} aria-label={label} title={label} aria-pressed={view===id&&!scope} className={view===id&&!scope?'selected':''} onClick={()=>selectView(id)}><Icon size={20} aria-hidden="true"/></button>)}</nav></aside>}
     <main id="main" tabIndex={-1}>
-      {!active && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>{setViewSlide('in');setScope(value==='unfiled'?'':value);setView('all');setQuery('');}} rename={batchRename} onDeleteCollection={deleteCollection}/></div>}
-      {active ? <section className="player-view" aria-label="Video player">
+      {!watching && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>{setViewSlide('in');setScope(value==='unfiled'?'':value);setView('all');setQuery('');}} rename={batchRename} onDeleteCollection={deleteCollection}/></div>}
+      {active && <section className={`player-view${minimized ? ' mini-player' : ''}`} aria-label={minimized ? 'Mini player' : 'Video player'}>
         <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || cutting ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
-            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onLoadedData={captureThumbnail} onSeeked={captureThumbnail} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}if(Math.abs(t-lastPositionPaint.current)>=.25){lastPositionPaint.current=t;setPosition(t);}if(Math.abs(t-lastSave.current)>5&&activeId){lastSave.current=t;updateItem(activeId,{position:t});}}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
+            {source && <video key={source} ref={videoRef} src={source} playsInline preload="metadata" muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null)} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={()=>{const t=videoRef.current?.currentTime||0;if(looping&&ab.a!==null&&ab.b!==null&&t>=ab.b){seek(ab.a);return;}if(Math.abs(t-lastPositionPaint.current)>=.25){lastPositionPaint.current=t;setPosition(t);}if(performance.now()-lastSave.current>15000) saveProgress();}} onEnded={handleEnded} onError={()=>{setLoading(false);setPlaying(false);setError('This video format is not supported by this player.');}}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default/>}</video>}
             {loading && !error && conversion===null && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}
             {conversion!==null && jobKind==='cut' && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>Removing segment · {timeLabel(conversion)}</span><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>Cancel</button></div>}
             {error && <div className="player-error"><Film size={28} aria-hidden="true"/><h2>Can’t play</h2>
@@ -588,6 +597,11 @@ export default function App() {
               <details className="error-details"><summary>Details</summary><p>{error}</p></details>
             </div>}
           </div>
+          {minimized && <div className="mini-controls">
+            <IconButton icon={playing ? Pause : Play} label={playing ? 'Pause' : 'Play'} onClick={togglePlay}/>
+            <IconButton icon={Maximize} label="Restore player" onClick={()=>setMinimized(false)}/>
+            <IconButton icon={X} label="Close player" onClick={closePlayer}/>
+          </div>}
           <div className="player-controls" onPointerEnter={() => revealChrome(true)} onPointerLeave={() => revealChrome()} onFocusCapture={() => revealChrome(true)}>
             <div className="seek-bar" data-loop={looping?'':undefined} data-cut={cutting?'':undefined} inert={controlsLocked||undefined} style={{'--progress':`${duration ? position/duration*100 : 0}%`,'--loop-a':`${rangeStartPct}%`,'--loop-b':`${rangeEndPct}%`} as React.CSSProperties}>
               <input className="seek-play" aria-label={pickingCut ? (cut.a===null ? 'Segment start' : 'Segment end') : pickingLoop ? (ab.a===null ? 'Loop start' : 'Loop end') : 'Playback position'} type="range" min="0" max={duration || 1} step="0.1" value={position} aria-valuetext={`${timeLabel(position)} of ${timeLabel(duration)}`} disabled={!duration || !!error} onChange={e => onSeekBar(Number(e.target.value))}/>
@@ -621,7 +635,8 @@ export default function App() {
             </div>
           </div>
         </div>
-      </section> : <section className="library-section" aria-label="Library">
+      </section>}
+      {!watching && <section className="library-section" aria-label="Library">
         <div className="library-header">
           <div className="library-title"><h1 className="sr-only">Library</h1><p className="library-count" role="status">{filtered.length} {filtered.length===1?'video':'videos'}</p></div>
           <nav className="library-tabs" aria-label="Browse videos" data-selected={scope?undefined:view}><span className="tab-pill" aria-hidden="true"/>{destinations.map(({id,label,icon:Icon})=><button key={id} aria-label={label} title={label} className={view===id&&!scope?'selected':''} aria-pressed={view===id&&!scope} onClick={()=>selectView(id)}><Icon size={20} aria-hidden="true"/></button>)}</nav>

@@ -3,12 +3,14 @@ export interface MediaItem { id: string; name: string; originalName?: string; si
 // Media bytes are stored once. Library reads and progress updates only touch metadata.
 const storedBlobs = new Set<string>();
 const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-  const request = indexedDB.open('videe-library', 2);
+  const request = indexedDB.open('videe-library', 3);
   request.onupgradeneeded = () => {
     const db = request.result;
     const videos = db.objectStoreNames.contains('videos')
       ? request.transaction!.objectStore('videos')
       : db.createObjectStore('videos', { keyPath: 'id' });
+    db.createObjectStore('progress', { keyPath: 'id' });
+    if (db.objectStoreNames.contains('media')) return;
     const media = db.createObjectStore('media', { keyPath: 'id' });
     const cursorRequest = videos.openCursor();
     cursorRequest.onsuccess = () => {
@@ -37,9 +39,14 @@ function completed(transaction: IDBTransaction): Promise<void> {
 export async function readLibrary(): Promise<MediaItem[]> {
   const db = await dbPromise;
   return new Promise((resolve, reject) => {
-    const request = db.transaction('videos').objectStore('videos').getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    const tx = db.transaction(['videos', 'progress']);
+    const videos = tx.objectStore('videos').getAll();
+    const progress = tx.objectStore('progress').getAll();
+    tx.oncomplete = () => {
+      const positions = new Map<string, number>(progress.result.map(row => [row.id, row.position]));
+      resolve(videos.result.map(item => ({...item, position: positions.get(item.id) ?? item.position})));
+    };
+    tx.onerror = () => reject(tx.error);
   });
 }
 export async function readMediaBlob(id: string): Promise<Blob | undefined> {
@@ -54,19 +61,21 @@ export async function saveItem(item: MediaItem): Promise<void> {
   const db = await dbPromise;
   const { blob, sessionUrl, ...metadata } = item;
   const writeBlob = !!blob && !storedBlobs.has(item.id);
-  const transaction = db.transaction(writeBlob ? ['videos', 'media'] : ['videos'], 'readwrite');
+  const transaction = db.transaction(writeBlob ? ['videos', 'media', 'progress'] : ['videos', 'progress'], 'readwrite');
   const done = completed(transaction);
   transaction.objectStore('videos').put(metadata);
+  transaction.objectStore('progress').put({id: item.id, position: item.position});
   if (writeBlob) transaction.objectStore('media').put({ id: item.id, blob });
   await done;
   if (writeBlob) storedBlobs.add(item.id);
 }
 export async function removeItem(id: string): Promise<void> {
   const db = await dbPromise;
-  const transaction = db.transaction(['videos', 'media'], 'readwrite');
+  const transaction = db.transaction(['videos', 'media', 'progress'], 'readwrite');
   const done = completed(transaction);
   transaction.objectStore('videos').delete(id);
   transaction.objectStore('media').delete(id);
+  transaction.objectStore('progress').delete(id);
   await done;
   storedBlobs.delete(id);
 }
@@ -75,5 +84,14 @@ export async function removeItem(id: string): Promise<void> {
 export async function renameItems(names: Map<string,string>): Promise<void> {
   const db=await dbPromise; const transaction=db.transaction('videos','readwrite');const done=completed(transaction);const store=transaction.objectStore('videos');
   for(const [id,name] of names){const request=store.get(id);request.onsuccess=()=>{if(request.result)store.put({...request.result,originalName:request.result.originalName||request.result.name,name});};}
+  await done;
+}
+
+// Playback checkpoints must never clone thumbnails or video bytes.
+export async function savePosition(id: string, position: number): Promise<void> {
+  const db = await dbPromise;
+  const transaction = db.transaction('progress', 'readwrite');
+  const done = completed(transaction);
+  transaction.objectStore('progress').put({id, position});
   await done;
 }

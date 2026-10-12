@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.7': 'Smoother MP4 playback with lightweight progress saves, plus a persistent mini player that continues across the library.',
   '0.1.6': 'Smoother 4K playback, direct file import, and broader video-format support.',
   '0.1.5': 'Bulk library removal, nested folder import, and deleting a folder also removes its videos.',
   '0.1.4': 'Sortable library lists with duration and size, per-folder order, and an info button for file details.',

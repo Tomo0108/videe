@@ -894,3 +894,12 @@ body { font-weight:400; }
   .list-actions,
   .video-list .video-card .file-menu { grid-column: 6; }
 }
+
+/* A persistent media surface: resizing never replaces the video element. */
+.player-view.mini-player { position: fixed; right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); width: min(340px, calc(100vw - 32px)); height: auto; aspect-ratio: 16 / 9; min-height: 0; padding: 0; z-index: 6; animation: none; }
+.mini-player .player-stage { min-height: 0; border-radius: 14px; box-shadow: 0 12px 40px #0008, 0 0 0 1px #ffffff24; }
+.mini-player .player-controls { display: none; }
+.mini-controls { position: absolute; inset: auto 0 0; display: flex; justify-content: flex-end; gap: 4px; padding: 20px 8px 8px; background: linear-gradient(transparent, #000b); z-index: 3; }
+.mini-controls .icon-button { color: #fff; width: 36px; height: 36px; }
+.mini-controls .icon-button:first-child { margin-right: auto; }
+.mini-player .video-surface video { cursor: pointer !important; }
