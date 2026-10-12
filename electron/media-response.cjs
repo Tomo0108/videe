@@ -32,7 +32,8 @@ async function mediaResponse(request, filePath) {
     status = 206;
   }
   if (request.method === 'HEAD' || !size) return new Response(null, { status, headers });
-  const stream = createReadStream(filePath, { start, end });
+  // Large reads keep high-bitrate 4K files flowing without thousands of tiny chunks per second.
+  const stream = createReadStream(filePath, { start, end, highWaterMark: 1 << 20 });
   const abort = () => stream.destroy();
   request.signal.addEventListener('abort', abort, { once: true });
   stream.on('close', () => request.signal.removeEventListener('abort', abort));

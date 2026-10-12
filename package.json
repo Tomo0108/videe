@@ -1,6 +1,6 @@
 {
   "name": "videe",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Videe",
   "author": "Videe",
@@ -30,6 +30,7 @@
     "test:mini-player": "node scripts/verify-mini-player.mjs",
     "test:ui": "node scripts/verify-tahoe.mjs",
     "test:tools": "node scripts/verify-tools.mjs",
+    "test:editor": "node scripts/verify-editor.mjs",
     "test:storage": "node scripts/verify-storage.mjs",
     "test:organization": "node scripts/verify-organization.mjs",
     "test:collections": "node scripts/verify-collections.mjs",

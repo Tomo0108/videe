@@ -43,15 +43,6 @@ try {
  assert.equal(await page.getByRole('slider',{name:'Loop end',exact:true}).count(),0);
  await page.getByRole('button',{name:'Loop',exact:true}).click();
  await page.locator('video').evaluate(v=>{v.pause();v.currentTime=0;});
- await page.getByRole('button',{name:'Remove segment',exact:true}).click();
- assert.equal(await page.locator('.seek-bar').getAttribute('data-cut'),'');
- await page.getByRole('slider',{name:'Segment start',exact:true}).fill('1');
- await page.getByRole('slider',{name:'Segment end',exact:true}).fill('3');
- await page.getByRole('button',{name:'Delete selected segment',exact:true}).click();
- await page.getByRole('button',{name:'Remove',exact:true}).click();
- await page.getByText('Removing a segment needs the Videe app.').waitFor();
- await dialogGone();
- await page.getByRole('button',{name:'Remove segment',exact:true}).click();
  await page.setViewportSize({width:390,height:844});
  assert.equal(await page.getByRole('button',{name:'Playback tools',exact:true}).count(),0);
  assert.ok(await page.locator('.player-controls').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
@@ -63,5 +54,5 @@ try {
  assert.equal(await page.locator('.continue-feature').count(),0);
  assert.equal(await page.locator('.video-thumbnail img').first().evaluate(el=>getComputedStyle(el).objectFit),'contain');
  assert.deepEqual(errors,[]);
- console.log('PASS: original icon, no header lock, loop bar range, invalid range, saved loop, next video, no playback tools, cut range needs app.');
+ console.log('PASS: original icon, no header lock, loop bar range, invalid range, saved loop, next video, no playback tools, no playback tools.');
 }catch(e){console.log(JSON.stringify(mediaEvents).slice(-8000));console.log(await page.locator('body').innerText());console.log(await page.locator('video').evaluate(v=>({time:v.currentTime,paused:v.paused,ended:v.ended,loop:v.loop})));throw e;}finally{await browser.close();}

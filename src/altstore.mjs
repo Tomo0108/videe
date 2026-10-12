@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.8': 'Smooth playback for any codec with live conversion like VLC, a pro editor with a frame-accurate timeline and export, and a redesigned library with folders, playlists and drag and drop.',
   '0.1.7': 'Smoother MP4 playback with lightweight progress saves, plus a persistent mini player that continues across the library.',
   '0.1.6': 'Smoother 4K playback, direct file import, and broader video-format support.',
   '0.1.5': 'Bulk library removal, nested folder import, and deleting a folder also removes its videos.',
