@@ -37,7 +37,7 @@ try {
   await page.getByRole('button', { name: 'Back to library' }).click();
   await page.locator('.library-section').waitFor();
   assert.equal(await page.getByRole('heading', { name: 'All videos', exact: true }).count(), 0);
-  assert.equal(await page.locator('.library-sidebar nav button').first().innerText(), '');
+  assert.match(await page.locator('.library-sidebar nav button').first().innerText(), /All videos/);
   assert.equal(await page.locator('.library-tabs button').first().innerText(), '');
   assert.equal(await page.locator('.library-count').isVisible(), true);
   const menu = page.locator('summary[aria-label="Options for sample.mp4"]');

@@ -115,6 +115,18 @@ export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string
     let local = '';
     const video = attachCaptureVideo();
     const run = async () => {
+      // The desktop app reads frames with FFmpeg, so every format gets a preview,
+      // including codecs the built-in decoder cannot show.
+      if (item.native && window.videe?.thumbnail) {
+        try {
+          const frame = await window.videe.thumbnail(item.id);
+          if (abort.signal.aborted) return;
+          if (needsThumbnail(item)) update(item.id, { thumbnail: frame.thumbnail, thumbnailVersion: THUMBNAIL_VERSION, duration: frame.duration || item.duration });
+          else if (frame.duration > 0) update(item.id, { duration: frame.duration });
+          video.remove();
+          return;
+        } catch { if (abort.signal.aborted) return; }
+      }
       try {
         const source = await sourceFor(item);
         if (abort.signal.aborted) { if (source.local) URL.revokeObjectURL(source.src); return; }
