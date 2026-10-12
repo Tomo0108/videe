@@ -1,0 +1,71 @@
+name: Update Windows release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-apps
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:fixtures
+      - run: npm test
+      - run: npm run package:win
+      - name: Record build provenance
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $file = "Videe-$version-win-setup.exe"
+          $hash = (Get-FileHash "release/$file" -Algorithm SHA256).Hash.ToLower()
+          "$hash  $file" | Set-Content "release/$file.sha256" -Encoding ascii
+          @{ version = $version; commit = $env:GITHUB_SHA; workflow = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"; sha256 = $hash } | ConvertTo-Json | Set-Content "release/windows-build.json" -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/*.exe
+            release/*.sha256
+            release/windows-build.json
+          if-no-files-found: error
+  publish:
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: windows-release
+      - name: Update Windows assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          gh release view "$TAG" --json body --jq .body > /tmp/videe-release-notes.md
+          (cd windows-release && sha256sum --check "Videe-$VERSION-win-setup.exe.sha256")
+          gh release upload "$TAG" windows-release/* --clobber
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          path = Path('/tmp/videe-release-notes.md')
+          notes = re.sub(r'\n*<!-- windows-build:start -->.*?<!-- windows-build:end -->', '', path.read_text(), flags=re.S).rstrip()
+          commit = os.environ['GITHUB_SHA']
+          run = f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          notes += f'\n\n<!-- windows-build:start -->\n### Windows build update\n\nWindows installer rebuilt from `{commit}`. Includes Windows video diagnostics, fullscreen fit controls, and updated icons.\n\n[Build and verification]({run}). SHA-256 and source commit are included in the release assets.\n<!-- windows-build:end -->\n'
+          path.write_text(notes)
+          PY
+          gh release edit "$TAG" --notes-file /tmp/videe-release-notes.md
