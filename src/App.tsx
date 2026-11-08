@@ -6,7 +6,11 @@ import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences 
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
 import { readLibrary, readMediaBlob, renameItems, saveItem, savePosition, removeItem, type MediaItem } from './store';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
+
+type OpenedFile = { url: string; path: string; name: string; type: string };
+/** Native iOS bridge (SceneDelegate.swift) for files opened from Files, Share or "Open in". */
+const VideeOpen = registerPlugin<{ takePending(): Promise<{ files: OpenedFile[] }>; release(options: { path: string }): Promise<void>; addListener(event: 'filesOpened', callback: () => void): Promise<PluginListenerHandle> }>('VideeOpen');
 import { isVideo, timeLabel, sizeLabel, toVtt, clampTime, clipLoop, codecLabel, codecName, timecode, normalizeSegments, splitSegments, segmentsDuration } from './media.mjs';
 import {Organization,readCollections,importedName,type Collection} from './organization';
 import {placeInFolders,sourceFolderGroups,sourceFolderName,moveToFolder} from './collections.mjs';
@@ -341,6 +345,64 @@ export default function App() {
     else fileIntoScope(picked.map(item=>item.id));
     if(picked[0] && !activeRef.current && !folderName && !scope) { visibleIds.current = next.map(i=>i.id); await openItem(next.find(i=>i.id===picked[0].id)!); }
   };
+  /** Play a file handed over by the OS (default app, "Open with", Dock/taskbar drop). */
+  const playOpened = async (item: MediaItem | undefined) => {
+    if(!item) return;
+    setMinimized(false);
+    if(item.id === activeRef.current) { void videoRef.current?.play().catch(() => {}); return; }
+    visibleIds.current = itemsRef.current.map(i => i.id);
+    await openItem(item, true, prefsRef.current.resume);
+  };
+  const openExternal = async (input: MediaItem[] | File[]) => {
+    if(!input.length) return;
+    if(input[0] instanceof File) {
+      let target: MediaItem | undefined;
+      for(const file of input as File[]) {
+        if(!isVideo(file.name,file.type)) continue;
+        const existing = itemsRef.current.find(i => !i.native && (i.originalName||i.name) === file.name && i.size === file.size);
+        if(existing) { target ||= existing; continue; }
+        const item: MediaItem = { id: crypto.randomUUID(), name:importedName(file.name), originalName:file.name, size:file.size, type:file.type, blob:file, added:Date.now(), duration:0, position:0, favorite:false, lastPlayed:0 };
+        try { await saveItem(item); } catch { notify('Storage is full. This video is available for this session only.'); }
+        const next = [...itemsRef.current,item]; itemsRef.current = next; setItems(next); target ||= item;
+      }
+      if(!target) { notify('This file is not a supported video.'); return; }
+      await playOpened(target);
+      return;
+    }
+    const records = input as MediaItem[];
+    const fresh = records.filter(p => !itemsRef.current.some(i => i.id === p.id)).map(p=>({...p,originalName:p.name,name:importedName(p.name)}));
+    for(const item of fresh) { try { await saveItem(item); } catch { notify('Changes could not be saved and may be lost when you close the app.'); } }
+    if(fresh.length) { const next = [...itemsRef.current,...fresh]; itemsRef.current=next; setItems(next); }
+    await playOpened(itemsRef.current.find(i => i.id === records[0].id));
+  };
+  const openExternalRef = useRef(openExternal); openExternalRef.current = openExternal;
+  useEffect(() => {
+    if(!ready) return;
+    const api = window.videe;
+    if(api?.onOpenFiles && api.takeOpenedFiles) {
+      const off = api.onOpenFiles(records => void openExternalRef.current(records));
+      void api.takeOpenedFiles().then(records => { if(records.length) void openExternalRef.current(records); }).catch(() => {});
+      return off;
+    }
+    if(!Capacitor.isNativePlatform()) return;
+    let cancelled = false; let handle: PluginListenerHandle | undefined;
+    const pull = async () => {
+      let files: OpenedFile[] = [];
+      try { files = (await VideeOpen.takePending()).files || []; } catch { return; }
+      const loaded: File[] = [];
+      for(const file of files) {
+        try {
+          const blob = await (await fetch(Capacitor.convertFileSrc(file.url))).blob();
+          loaded.push(new File([blob], file.name, { type: file.type || blob.type }));
+        } catch { notify('Could not open this file.'); }
+        finally { void VideeOpen.release({ path: file.path }).catch(() => {}); }
+      }
+      if(!cancelled && loaded.length) await openExternalRef.current(loaded);
+    };
+    void VideeOpen.addListener('filesOpened', () => void pull()).then(h => { if(cancelled) void h.remove(); else handle = h; }).catch(() => {});
+    void pull();
+    return () => { cancelled = true; void handle?.remove(); };
+  }, [ready, notify]);
   const pickFolder = async () => {
     if(busy || !ready || controlsLocked) return;
     if(window.videe) {

@@ -1,6 +1,6 @@
 {
   "name": "videe",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Videe",
   "author": "Videe",
@@ -51,6 +51,15 @@
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["mp4", "m4v", "mov", "qt", "webm", "mkv", "avi", "divx", "wmv", "asf", "flv", "f4v", "mpeg", "mpg", "m2ts", "mts", "ts", "3gp", "3g2", "ogv", "vob", "mxf", "dv", "rm", "rmvb"],
+        "name": "Video",
+        "description": "Video file",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
     ],
     "mac": {
       "category": "public.app-category.video",

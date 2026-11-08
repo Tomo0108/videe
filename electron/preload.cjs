@@ -24,5 +24,7 @@ contextBridge.exposeInMainWorld('videe', {
   cancelConversion: () => ipcRenderer.invoke('cancel-conversion'),
   listSubtitles: id => ipcRenderer.invoke('list-subtitles', id),
   extractSubtitle: (id, index) => ipcRenderer.invoke('extract-subtitle', id, index),
+  takeOpenedFiles: () => ipcRenderer.invoke('take-opened-files'),
+  onOpenFiles: callback => { const handler = (_event, records) => callback(records); ipcRenderer.on('open-files', handler); return () => ipcRenderer.removeListener('open-files', handler); },
   onConversionProgress: callback => { const handler = (_event, value) => callback(value); ipcRenderer.on('conversion-progress', handler); return () => ipcRenderer.removeListener('conversion-progress', handler); }
 });
