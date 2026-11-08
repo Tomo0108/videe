@@ -39,3 +39,12 @@ test('folder group names use the import root and first subdirectory', () => {
   assert.equal(folderGroupName('/Movies', join('/Movies', 'Action', 'Clip.mkv')), 'Action');
   assert.equal(folderGroupName('/Movies', join('/Movies', 'Action', '2024', 'Clip.mov')), 'Action');
 });
+
+test('files opened from the OS keep only existing absolute video paths', () => {
+  const { openablePaths } = createRequire(import.meta.url)('../electron/folder.cjs');
+  const present = new Set(['/videos/a.mkv', '/videos/B.MP4', '/videos/notes.txt', 'C:\\Videos\\clip.mov']);
+  const exists = file => present.has(file);
+  const args = ['--dev', '.', '-psn_0_123', 'relative.mp4', '/videos/a.mkv', '/videos/B.MP4', '/videos/notes.txt', '/videos/missing.mp4', '--allow-file-access-from-files', null];
+  assert.deepEqual(openablePaths(args, exists), ['/videos/a.mkv', '/videos/B.MP4']);
+  assert.deepEqual(openablePaths(undefined, exists), []);
+});

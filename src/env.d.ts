@@ -35,6 +35,8 @@ declare global {
       cancelConversion(): Promise<void>;
       listSubtitles(id: string): Promise<{ index: number; language: string; codec: string; label: string }[]>;
       extractSubtitle(id: string, index: number): Promise<string>;
+      takeOpenedFiles?(): Promise<MediaItem[]>;
+      onOpenFiles?(cb: (records: MediaItem[]) => void): () => void;
       onConversionProgress(cb: (value: { id: string; seconds: number; total?: number }) => void): () => void;
     };
   }

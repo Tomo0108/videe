@@ -1,5 +1,6 @@
 const { readdir } = require('node:fs/promises');
-const { basename, extname, join, relative } = require('node:path');
+const { basename, extname, isAbsolute, join, relative } = require('node:path');
+const { existsSync } = require('node:fs');
 
 const VIDEO_EXT = new Set(['mp4','m4v','mov','qt','webm','mkv','avi','divx','wmv','asf','flv','f4v','mpeg','mpg','m2ts','mts','ts','3gp','3g2','ogv','vob','mxf','dv','hevc','av1','rm','rmvb']);
 
@@ -28,4 +29,9 @@ function folderGroupName(root, filePath) {
   return parts[0];
 }
 
-module.exports = { collectVideoPaths, VIDEO_EXT, folderGroupName };
+/** Video files named on a command line or by the OS "open file" handoff; flags and other paths are ignored. */
+function openablePaths(args, exists = existsSync) {
+  return (Array.isArray(args) ? args : []).filter(arg => typeof arg === 'string' && !arg.startsWith('-') && isAbsolute(arg) && VIDEO_EXT.has(extname(arg).slice(1).toLowerCase()) && exists(arg));
+}
+
+module.exports = { collectVideoPaths, VIDEO_EXT, folderGroupName, openablePaths };

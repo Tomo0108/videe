@@ -3,12 +3,15 @@ const { basename, dirname, extname, isAbsolute, join } = require('node:path');
 const { existsSync, readFileSync } = require('node:fs');
 const { PassThrough, Readable } = require('node:stream');
 const { mediaResponse } = require('./media-response.cjs');
-const { collectVideoPaths, folderGroupName } = require('./folder.cjs');
+const { collectVideoPaths, folderGroupName, openablePaths } = require('./folder.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 protocol.registerSchemesAsPrivileged([{ scheme: 'videe', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
 if (!app.isPackaged && process.env.VIDEE_TEST_USER_DATA) app.setPath('userData', process.env.VIDEE_TEST_USER_DATA);
+// One Videe at a time: opening a file from Finder/Explorer while Videe runs hands it to the open window.
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 let win, registry = {}, processJob, registryFile, cacheDir, liveJob;
 let writeQueue = Promise.resolve();
 let mediaModule;
@@ -170,8 +173,33 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
+  win.webContents.on('did-start-loading', () => { rendererReady = false; });
+  win.on('closed', () => { rendererReady = false; });
   if (process.argv.includes('--dev')) win.loadURL('http://127.0.0.1:5173'); else win.loadFile(playerHtml());
 }
+// Files opened from the OS ("Open with", default app, Dock/taskbar drop) wait here until the player is ready.
+let openQueue = [], rendererReady = false;
+function showWindow() {
+  if (!win || win.isDestroyed()) { createWindow(); return; }
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+}
+async function flushOpenQueue() {
+  if (!rendererReady || !win || win.isDestroyed() || !openQueue.length) return;
+  const files = openQueue.splice(0);
+  try { const records = await importPaths(files); if (records.length) win.webContents.send('open-files', records); } catch { /* Unreadable files are skipped. */ }
+}
+function queueOpen(args) {
+  const files = openablePaths(args);
+  if (files.length) openQueue.push(...files);
+  if (!app.isReady() || !registryFile) return;
+  if (files.length || BrowserWindow.getAllWindows().length === 0) showWindow();
+  void flushOpenQueue();
+}
+// macOS delivers files through open-file, which can fire before the app is ready.
+app.on('open-file', (event, file) => { event.preventDefault(); queueOpen([file]); });
+app.on('second-instance', (_event, argv) => { queueOpen(argv.slice(1)); showWindow(); });
+if (process.platform !== 'darwin') queueOpen(process.argv.slice(1));
 function playerHtml() {
   const dist = join(__dirname, '../dist');
   for (const name of ['app.html', 'index.html']) {
@@ -184,6 +212,7 @@ function playerHtml() {
 }
 const EXPORT_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'mkv', 'webm', 'ts', 'm2ts', 'mts', 'avi']);
 app.whenReady().then(async () => {
+  if (!primaryInstance) return;
   // Keep the runtime Dock icon consistent with the rounded icon embedded in the macOS app bundle.
   if (process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../dist/icons/icon-rounded.png'));
   registryFile = join(app.getPath('userData'), 'library.json'); cacheDir = join(app.getPath('userData'), 'converted');
@@ -228,6 +257,7 @@ app.whenReady().then(async () => {
     return { name, records, folders: [...grouped].map(([folder, ids]) => ({ name: folder, ids })) };
   });
   register('import-paths', importPaths);
+  register('take-opened-files', async () => { rendererReady = true; const files = openQueue.splice(0); return files.length ? importPaths(files) : []; });
   register('get-source', async id => { const entry = registry[id]; if (!entry) throw new Error('File not found. Please add it again.'); await fs.access(entry.converted || entry.path); return `videe://media/${id}`; });
   register('analyze-video', async id => analyze(id));
   register('live-source', async (id, start, hardware = true) => {
