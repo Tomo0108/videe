@@ -101,12 +101,13 @@ function attachCaptureVideo() {
   document.body.append(video);
   return video;
 }
-export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string,data:Partial<MediaItem>)=>void){
+/** Generates missing previews one at a time. `skip` is the file the player is using right now. */
+export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string,data:Partial<MediaItem>)=>void,skip=''){
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const attempted = useRef(new Set<string>());
   const [, kick] = useState(0);
-  const nextId = paused ? '' : items.find(item => needsPreview(item) && !attempted.current.has(item.id))?.id || '';
+  const nextId = paused ? '' : items.find(item => item.id !== skip && needsPreview(item) && !attempted.current.has(item.id))?.id || '';
   useEffect(() => {
     if (!nextId) return;
     const item = itemsRef.current.find(entry => entry.id === nextId);

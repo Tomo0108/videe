@@ -20,7 +20,7 @@ try {
   await dialogGone();
   const buffer=await readFile('tests/fixtures/sample.mp4');
   await page.locator('input[type=file]').first().setInputFiles([{name:'Zulu.mp4',mimeType:'video/mp4',buffer},{name:'Alpha.mp4',mimeType:'video/mp4',buffer}]);
-  await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
+  await page.waitForFunction(()=>document.querySelector('.player-view video')?.readyState>=2);
   await page.getByRole('slider',{name:'Playback position',exact:true}).fill('4');
   await page.getByRole('button',{name:'Back to library'}).click();
   await page.getByRole('button',{name:/Continue watching/}).filter({visible:true}).click();
@@ -35,11 +35,11 @@ try {
   await page.locator('.video-list').waitFor();
   assert.equal(await page.getByRole('button',{name:'Name',exact:true}).getAttribute('aria-sort'),'ascending');
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
-  await page.getByRole('button',{name:'Play Alpha.mp4'}).click();
-  await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
+  await page.getByRole('button',{name:'Play Alpha.mp4'}).locator('.video-thumbnail').click(); // The list row button uses display: contents.
+  await page.waitForFunction(()=>document.querySelector('.player-view video')?.readyState>=2);
   await page.getByRole('button',{name:'Next video',exact:true}).click();
   await page.getByRole('heading',{name:'Zulu.mp4',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
+  await page.waitForFunction(()=>document.querySelector('.player-view video')?.readyState>=2);
   await page.getByRole('button',{name:'Previous video',exact:true}).click();
   await page.getByRole('heading',{name:'Alpha.mp4',exact:true}).waitFor();
   await page.getByRole('button',{name:'Back to library'}).click();
@@ -55,8 +55,8 @@ try {
   await dialogGone();
   await page.locator('summary[aria-label="Options for Zulu.mp4"]').click();
   await page.getByRole('button',{name:'Resume Zulu.mp4',exact:true}).click();
-  await page.waitForFunction(()=>{const v=document.querySelector('video');return v.readyState>=2&&v.currentTime>=3.9&&!v.paused;});
-  await page.locator('video').evaluate(v=>v.pause());
+  await page.waitForFunction(()=>{const v=document.querySelector('.player-view video');return v.readyState>=2&&v.currentTime>=3.9&&!v.paused;});
+  await page.locator('.player-view video').evaluate(v=>v.pause());
   await page.getByRole('button',{name:'Back to library'}).click();
   await page.locator('summary[aria-label="Options for Zulu.mp4"]').click();
   await page.getByRole('button',{name:'Reset watch history'}).click();
