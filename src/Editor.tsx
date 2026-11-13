@@ -203,7 +203,7 @@ export function EditorPanel(props:EditorProps) {
 
 const RESOLUTIONS = [{value:0,label:'Original'},{value:2160,label:'2160p (4K)'},{value:1440,label:'1440p'},{value:1080,label:'1080p'},{value:720,label:'720p'},{value:480,label:'480p'}];
 
-export function ExportDialog({native,duration,segments,sourceHeight,onClose,onExport}:{native:boolean;duration:number;segments:Segment[];sourceHeight:number;onClose:()=>void;onExport:(options:Omit<ExportOptions,'segments'|'duration'>)=>void}) {
+export function ExportDialog({native,appHref,duration,segments,sourceHeight,onClose,onExport}:{native:boolean;appHref?:string;duration:number;segments:Segment[];sourceHeight:number;onClose:()=>void;onExport:(options:Omit<ExportOptions,'segments'|'duration'>)=>void}) {
   const [mode,setMode] = useState<'encode'|'copy'>('encode');
   const [codec,setCodec] = useState<'h264'|'hevc'>('h264');
   const [quality,setQuality] = useState<'high'|'standard'|'small'>('high');
@@ -218,7 +218,8 @@ export function ExportDialog({native,duration,segments,sourceHeight,onClose,onEx
   const copy = mode === 'copy';
   return <Modal title="Export" onClose={onClose}>
     <p className="export-summary">{timeLabel(output)} from {segments.length || 1} {segments.length > 1 ? 'segments' : 'segment'}</p>
-    {!native && <p className="subtle-text export-note">Exporting needs the Videe desktop app.</p>}
+    {!native && <div className="export-notice" role="note"><Download size={18} aria-hidden="true"/><p>Exporting needs the Videe desktop app.</p>{appHref && <a href={appHref}>Get the app</a>}</div>}
+    <fieldset className="export-fields" disabled={!native}>
     <div className="settings-group">
       <label className="setting-row"><span>Method<small>{copy ? 'Fast, original quality. Cuts snap to the nearest keyframe.' : 'Frame-accurate cuts with your choice of format.'}</small></span><select aria-label="Export method" value={mode} onChange={e => setMode(e.target.value as 'encode'|'copy')}><option value="encode">Re-encode</option><option value="copy">Lossless copy</option></select></label>
       {!copy && <>
@@ -235,6 +236,7 @@ export function ExportDialog({native,duration,segments,sourceHeight,onClose,onEx
       <label className="setting-row"><span>Destination</span><select aria-label="Destination" value={destination} onChange={e => setDestination(e.target.value as 'file'|'apply')}><option value="file">Save as new file…</option><option value="apply">Replace in Videe (keeps original)</option></select></label>
       {destination === 'file' && <label className="setting-row"><span>Add to library</span><input type="checkbox" role="switch" aria-label="Add to library" checked={addToLibrary} onChange={e => setAddToLibrary(e.target.checked)}/></label>}
     </div>
+    </fieldset>
     <div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={!native || output < 0.25} onClick={() => onExport({mode,codec,quality,height,audio,rotate,fps,hardware,destination,addToLibrary})}>Export</button></div>
   </Modal>;
 }

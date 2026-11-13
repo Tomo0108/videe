@@ -10,7 +10,7 @@ try {
   await page.goto('http://127.0.0.1:5173');
   await page.getByRole('button', { name: 'Open folder', exact: true }).waitFor();
   await page.locator('input[type=file]').first().setInputFiles(resolve('tests/fixtures/sample.mp4'));
-  await page.waitForFunction(() => document.querySelector('video')?.readyState >= 2);
+  await page.waitForFunction(() => document.querySelector('.player-view video')?.readyState >= 2);
   await page.locator('.transport-play').click();
   await page.locator('body').click({ position: { x: 5, y: 5 } });
   // Modified keys must remain available to browser/OS shortcuts.
@@ -23,13 +23,13 @@ try {
   await page.keyboard.press('Control+m');
   await page.getByRole('button', { name: 'Unmute', exact: true }).waitFor();
   await page.keyboard.press('Space');
-  await page.waitForFunction(() => !document.querySelector('video').paused);
+  await page.waitForFunction(() => !document.querySelector('.player-view video').paused);
   const volume = await page.locator('video').evaluate(v => v.volume);
   await page.keyboard.press('ArrowDown');
   assert.ok(await page.locator('video').evaluate(v => v.volume) < volume);
   await page.keyboard.press('Digit5');
   await page.waitForFunction(() => {
-    const v = document.querySelector('video');
+    const v = document.querySelector('.player-view video');
     return v && Number.isFinite(v.duration) && Math.abs(v.currentTime - v.duration * 0.5) < 0.5;
   });
   await page.keyboard.press(']');
@@ -38,7 +38,7 @@ try {
   await page.locator('.library-section').waitFor();
   assert.equal(await page.getByRole('heading', { name: 'All videos', exact: true }).count(), 0);
   assert.match(await page.locator('.library-sidebar nav button').first().innerText(), /All videos/);
-  assert.equal(await page.locator('.library-tabs button').first().innerText(), '');
+  assert.equal(await page.locator('.library-tabs .tab-label').first().textContent(), 'All');
   assert.equal(await page.locator('.library-count').isVisible(), true);
   const menu = page.locator('summary[aria-label="Options for sample.mp4"]');
   await menu.focus();
