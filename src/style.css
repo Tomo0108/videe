@@ -1285,3 +1285,31 @@ body { font-weight:400; }
 .export-fields .setting-row { padding-block: 10px; }
 .playback-note { margin-top: 14px; }
 
+/* ───────────── UI refresh: finishing touches ───────────── */
+/* Touch: every tap target is at least 44×44; icons keep their size and the padding grows. */
+@media (pointer: coarse) {
+  .icon-button, .layout-switch .icon-button, .header-actions .icon-button, .modal-head .icon-button { min-width: 44px; min-height: 44px; }
+  .player-controls .icon-button { min-width: 40px; min-height: 44px; }
+  .video-select { width: 44px; height: 44px; }
+  .video-select input { width: 28px; height: 28px; }
+  .file-menu summary, .collection-new summary, .choice-menu summary { min-width: 44px; min-height: 44px; }
+  .video-card { grid-template-columns: 44px minmax(0, 1fr); }
+  .video-list .video-card .file-menu { min-width: 44px; }
+  .layout-switch .icon-button { width: 44px; height: 44px; }
+  .layout-pill { width: 44px; }
+  .layout-switch[data-layout=list] .layout-pill { translate: 44px 0; }
+}
+@media (pointer: coarse) and (max-width: 360px) { .player-controls .icon-button { min-width: 36px; } }
+
+/* Sheets: a lighter backdrop and a visible focus ring on text fields. */
+.modal::backdrop { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.modal input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,
+.modal select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .modal::backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .player-controls[data-more] .playback-more { background: #171717; }
+  .video-grid:not(.video-list) .video-card .video-favorite { background: #000; }
+}
+:root[data-motion=off] .player-controls[data-more] .playback-more { animation: none; }
+:root[data-motion=off] .video-grid:not(.video-list) .video-card .video-favorite { transition: none; }
