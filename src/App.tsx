@@ -1,7 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -72,6 +72,7 @@ export default function App() {
   const [infoId, setInfoId] = useState<string|null>(null);
   const queue = useRef<string[]>([]); const visibleIds = useRef<string[]>([]);
   const [minimized, setMinimized] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false); const playbackOptionsRef = useRef<HTMLDivElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null); const [source, setSource] = useState(''); const [playing,setPlaying] = useState(false); const [position,setPosition] = useState(0); const [duration,setDuration] = useState(0);
   const [muted,setMuted] = useState(false); const [error,setError] = useState(''); const [loading,setLoading] = useState(false); const [busy,setBusy] = useState(false); const [conversion,setConversion] = useState<number | null>(null); const [conversionTotal,setConversionTotal] = useState(0);
   const [prefs,setPrefs] = useState<Preferences>(getPreferences); const prefsRef = useRef(prefs); prefsRef.current = prefs;
@@ -162,7 +163,17 @@ export default function App() {
     const updated = {...item,...changes}; const next = itemsRef.current.map(i => i.id === id ? updated : i); itemsRef.current = next; setItems(next);
     if(persist) void saveItem(updated).catch(() => notify('Changes could not be saved and may be lost when you close the app.'));
   }, [notify]);
-  useThumbnails(items,!!activeId||busy,updateItem);
+  // Thumbnails keep generating in the library and while the player is minimized or paused;
+  // only active full-size playback and imports pause them. The playing file is never decoded twice.
+  useThumbnails(items,busy||(watching&&playing),updateItem,activeId||'');
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (event: PointerEvent) => { if (!playbackOptionsRef.current?.contains(event.target as Node)) setMoreOpen(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); setMoreOpen(false); playbackOptionsRef.current?.querySelector<HTMLElement>('.more-toggle')?.focus(); } };
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', key, true);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', key, true); };
+  }, [moreOpen]);
+  useEffect(() => { if (!watching) setMoreOpen(false); }, [watching]);
   const saveCollections=(next:Collection[])=>{try{localStorage.setItem('videe-collections',JSON.stringify(next));collectionsRef.current=next;setCollections(next);return true;}catch{notify('Could not save collections.');return false;}};
   const fileIntoScope=(ids:string[])=>{if(!collections.some(c=>c.id===scope)||!ids.length)return;saveCollections(collections.map(c=>c.id===scope?{...c,ids:[...new Set([...c.ids,...ids])]}:c));};
   const fileIntoFolders=(groups:{name:string;ids:string[]}[],rootName='')=>{const ids=[...new Set(groups.flatMap(group=>group.ids))];if(!groups.length){fileIntoScope(ids);return false;}const {collections:next,folderId}=placeInFolders(collections,groups,rootName);if(!folderId){fileIntoScope(ids);return false;}if(saveCollections(next)){setViewSlide('in');setScope(folderId);setView('all');setQuery('');return true;}return false;};
@@ -984,7 +995,7 @@ export default function App() {
     <main id="main" tabIndex={-1} className={editing && watching ? 'editing' : undefined}>
       {!watching && <div className="library-organization"><Organization items={items} collections={collections} save={saveCollections} selected={selected} select={setSelected} scope={scope==='unfiled'?'':scope} setScope={value=>openScope(value==='unfiled'?'':value)} rename={batchRename} onDeleteCollection={deleteCollection}/></div>}
       {active && <section className={`player-view${minimized ? ' mini-player' : ''}`} aria-label={minimized ? 'Mini player' : 'Video player'}>
-        <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || editing ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
+        <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || editing || moreOpen ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
           <div className="video-surface" inert={controlsLocked}>
             {source && <video key={source} ref={videoRef} src={source} playsInline preload={engine === 'live' ? 'auto' : 'metadata'} muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null) && engine === 'direct'} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} onError={handleVideoError}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default onLoad={shiftCues}/>}</video>}
             {loading && !error && !blockingJob && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}
@@ -998,11 +1009,12 @@ export default function App() {
             </div>}
           </div>
           {minimized && <div className="mini-controls">
-            <IconButton icon={playing ? Pause : Play} label={playing ? 'Pause' : 'Play'} onClick={togglePlay}/>
+            <span className="mini-title" title={active.name}>{active.name.replace(/\.[^.]+$/, '')}</span>
+            <IconButton icon={playing ? Pause : Play} label={playing ? 'Pause' : 'Play'} className="mini-play" onClick={togglePlay}/>
             <IconButton icon={Maximize} label="Restore player" onClick={()=>setMinimized(false)}/>
             <IconButton icon={X} label="Close player" onClick={closePlayer}/>
           </div>}
-          <div className="player-controls" onPointerEnter={() => revealChrome(true)} onPointerLeave={() => revealChrome()} onFocusCapture={() => revealChrome(true)}>
+          <div className="player-controls" data-more={moreOpen ? '' : undefined} onPointerEnter={() => revealChrome(true)} onPointerLeave={() => revealChrome()} onFocusCapture={() => revealChrome(true)}>
             <div className="seek-bar" data-loop={looping?'':undefined} data-live={engine === 'live' ? '' : undefined} inert={controlsLocked||undefined} style={{'--progress':`${duration ? position/duration*100 : 0}%`,'--loop-a':`${rangeStartPct}%`,'--loop-b':`${rangeEndPct}%`} as React.CSSProperties}
               onPointerEnter={() => loadFilmstrip()}
               onPointerMove={e => { if (!duration) return; const rect = e.currentTarget.getBoundingClientRect(); const pct = Math.max(0, Math.min(100, (e.clientX - rect.left) / rect.width * 100)); setHover({ t: pct / 100 * duration, pct }); }}
@@ -1021,21 +1033,23 @@ export default function App() {
                 {index > 0 && <IconButton icon={SkipBack} label="Previous video" onClick={() => nextVideo(-1)}/>}{index < queue.current.length-1 && <IconButton icon={SkipForward} label="Next video" onClick={() => nextVideo(1)}/>}
                 <button type="button" className="time-label" title="Show remaining time" onClick={() => setPrefs({...prefs, timeDisplay: prefs.timeDisplay === 'remaining' ? 'elapsed' : 'remaining'})}>{prefs.timeDisplay === 'remaining' ? `−${timeText(Math.max(0, duration - position))}` : timeText(position)}<span> / {timeText(duration)}</span></button>
               </div>
-              <div className="playback-options">
-                <IconButton icon={controlsLocked ? LockKeyhole : LockKeyholeOpen} label={controlsLocked ? 'Unlock controls' : 'Lock controls'} active={controlsLocked} disabled={blockingJob} onClick={()=>{setControlsLocked(locked=>!locked);setChrome(true);}}/>
-                <div className="playback-more" inert={controlsLocked||undefined}>
+              <div className="playback-options" ref={playbackOptionsRef}>
+                <IconButton icon={controlsLocked ? LockKeyhole : LockKeyholeOpen} label={controlsLocked ? 'Unlock controls' : 'Lock controls'} active={controlsLocked} disabled={blockingJob} className="lock-toggle" onClick={()=>{setControlsLocked(locked=>!locked);setChrome(true);}}/>
+                <div className="playback-more" id="playback-more" inert={controlsLocked||undefined} onClick={event => { const button = (event.target as HTMLElement).closest('button'); if (button && (!button.hasAttribute('aria-pressed') || button.classList.contains('more-lock'))) setMoreOpen(false); }}>
+                  <IconButton icon={controlsLocked ? LockKeyhole : LockKeyholeOpen} label={controlsLocked ? 'Unlock controls' : 'Lock controls'} active={controlsLocked} disabled={blockingJob} className="more-lock" onClick={()=>{setControlsLocked(locked=>!locked);setChrome(true);}}/>
                   <IconButton icon={LoopRangeIcon} label="Loop" active={looping} disabled={!duration || !!error || blockingJob} onClick={toggleLoop}/>
                   <IconButton icon={prefs.repeat==='one'?Repeat1:Repeat} label={`Repeat: ${prefs.repeat==='off'?'Off':prefs.repeat==='one'?'One':'All'}`} active={prefs.repeat!=='off'} onClick={()=>setPrefs({...prefs,repeat:prefs.repeat==='off'?'one':prefs.repeat==='one'?'all':'off'})}/>
                   <div className="volume-control"><IconButton icon={muted || prefs.volume===0 ? VolumeX : Volume2} label={muted ? 'Unmute' : 'Mute'} onClick={() => setMuted(!muted)}/><input type="range" aria-label="Volume" title={`${Math.round((muted ? 0 : prefs.volume) * 100)}%`} min="0" max="1" step="0.01" value={muted ? 0 : prefs.volume} style={{'--progress':`${(muted ? 0 : prefs.volume) * 100}%`} as React.CSSProperties} onChange={e => { setMuted(false); setPrefs({...prefs,volume:Number(e.target.value)}); }}/></div>
-                  <select className="speed-select" aria-label="Playback speed" value={prefs.speed} onChange={e => setPrefs({...prefs,speed:Number(e.target.value)})}>{SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select>
-                  <button aria-label="Subtitles" title="Subtitles" className={`caption-button ${subtitle && captions ? 'active' : ''}`} onClick={() => setModal('subtitles')}><Captions size={18} aria-hidden="true"/></button>
+                  <label className="speed-control"><span>Speed</span><select className="speed-select" aria-label="Playback speed" value={prefs.speed} onChange={e => setPrefs({...prefs,speed:Number(e.target.value)})}>{SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}</select></label>
+                  <button aria-label="Subtitles" title="Subtitles" className={`icon-button caption-button ${subtitle && captions ? 'active' : ''}`} onClick={() => setModal('subtitles')}><Captions size={18} aria-hidden="true"/></button>
                   <IconButton icon={Camera} label="Save frame" disabled={!source || !!error} onClick={() => void snapshot()}/>
                   <IconButton icon={Info} label="Playback details" onClick={() => setModal('playback')}/>
                   <IconButton icon={PictureInPicture2} label="Picture in Picture" onClick={() => void pictureInPicture()}/>
                   <IconButton icon={ZoomIn} label="Fill screen" disabled={!source || !!error} onClick={() => void fillScreen()}/>
                   {videoZoom>1 && <IconButton icon={RotateCcw} label="Reset video view" onClick={resetVideoView}/>}
-                  <IconButton icon={isFullscreen ? Minimize : Maximize} label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => void fullscreen()}/>
                 </div>
+                <IconButton icon={isFullscreen ? Minimize : Maximize} label={isFullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => void fullscreen()}/>
+                <button type="button" className="icon-button more-toggle" aria-label="More controls" title="More controls" aria-haspopup="true" aria-expanded={moreOpen} aria-controls="playback-more" onClick={() => setMoreOpen(open => !open)}><Ellipsis size={18} strokeWidth={1.8} aria-hidden="true"/></button>
               </div>
             </div>
           </div>
