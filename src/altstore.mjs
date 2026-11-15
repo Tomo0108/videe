@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.14': 'The quick guide gains a side panel that lists every step and follows along as you read, and its close button works again in the Mac app.',
   '0.1.13': 'Faster loading: previews are made in parallel with fewer ffmpeg runs, and large folders import more quickly.',
   '0.1.12': 'A cleaner library: only titles appear under videos, and Video info gathers duration, size, format, progress, folder and more on tidy one-line rows. Long names no longer break menus or the phone layout, and subtitles start off with Japanese tracks chosen first.',
   '0.1.11': 'The Mac app opens again: it is now signed so macOS no longer reports it as damaged. Only the open button you pressed shows a spinner while videos import.',

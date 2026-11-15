@@ -1,4 +1,4 @@
-import {useRef,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import type {LucideIcon} from 'lucide-react';
 import {ArrowLeft,Camera,Captions,Download,Ellipsis,FastForward,FolderOpen,FolderPlus,Lightbulb,Heart,Keyboard,LayoutGrid,LifeBuoy,List,ListPlus,LockKeyhole,Maximize,MonitorCog,Play,Rewind,Scissors,Search,Settings2,ShieldCheck,Sparkles,Upload} from 'lucide-react';
 import {Modal} from './Modal';
@@ -113,22 +113,43 @@ function Figure({shot, points}: {shot: Shot; points: Point[]}) {
 export function QuickGuide({version, edition = currentEdition(), onClose, onStartTour}: {version: string; edition?: Edition; onClose: () => void; onStartTour?: () => void}) {
   const STEPS = steps(edition);
   const body = useRef<HTMLDivElement>(null);
-  const jump = (id: string) => body.current?.querySelector(`#guide-${id}`)?.scrollIntoView({behavior: document.documentElement.dataset.motion === 'off' ? 'auto' : 'smooth', block: 'start'});
+  const [current, setCurrent] = useState(STEPS[0].id);
+  const jump = (id: string) => { setCurrent(id); body.current?.querySelector(`#guide-${id}`)?.scrollIntoView({behavior: document.documentElement.dataset.motion === 'off' ? 'auto' : 'smooth', block: 'start'}); };
+  // Highlights the step being read in the side panel.
+  useEffect(() => {
+    const root = body.current?.closest('dialog'); const sections = [...(body.current?.querySelectorAll<HTMLElement>('.guide-step') || [])];
+    if (!root || !sections.length) return;
+    const sync = () => {
+      const top = root.getBoundingClientRect().top + 120;
+      const atEnd = root.scrollTop + root.clientHeight >= root.scrollHeight - 4;
+      const passed = sections.filter(section => section.getBoundingClientRect().top <= top);
+      setCurrent((atEnd ? sections[sections.length - 1] : passed[passed.length - 1] || sections[0]).id.replace(/^guide-/, ''));
+    };
+    root.addEventListener('scroll', sync, {passive: true});
+    return () => root.removeEventListener('scroll', sync);
+  }, [edition]);
+  const nav = (className: string) => <nav className={className} aria-label="目次">{STEPS.map((step, index) => <button key={step.id} type="button" aria-current={current === step.id ? 'step' : undefined} onClick={() => jump(step.id)}><span className="guide-nav-num">{index + 1}</span><step.icon size={15} aria-hidden="true"/><span className="guide-nav-label">{step.title}</span></button>)}</nav>;
   return <Modal title="クイックガイド" className="guide-modal" onClose={onClose}>
     <div className="guide" ref={body}>
-      <p className="guide-meta">{edition === 'mac' ? 'Mac' : 'Windows'} 版 · Videe {version}</p>
-      <nav className="guide-toc" aria-label="目次">{STEPS.map((step, index) => <button key={step.id} type="button" onClick={() => jump(step.id)}><span>{index + 1}</span>{step.title}</button>)}</nav>
-      {STEPS.map((step, index) => <section key={step.id} id={`guide-${step.id}`} className="guide-step" aria-labelledby={`guide-${step.id}-title`}>
-        <header><span className="guide-badge">STEP {index + 1}</span><h3 id={`guide-${step.id}-title`}><step.icon size={18} aria-hidden="true"/>{step.title}</h3></header>
-        <p className="guide-lead">{step.lead}</p>
-        {step.shot && <Figure shot={`${step.shot}-${edition}` as Shot} points={step.points}/>}
-        {step.points.length > 0 && <ol className="guide-points">{step.points.map((point, i) => <li key={i}><Num n={i + 1}/><span>{point.body}</span></li>)}</ol>}
-        {step.id === 'shortcuts' && <dl className="guide-shortcuts">{shortcuts(edition).map(([label, keys]) => <div key={label}><dt>{label}</dt><dd><Keys keys={keys}/></dd></div>)}</dl>}
-        {step.tip && <p className="guide-tip"><Lightbulb size={15} aria-hidden="true"/><span><b>ポイント</b>{step.tip}</span></p>}
-      </section>)}
-      <div className="guide-footer">
-        {onStartTour && <button type="button" className="secondary-button" onClick={onStartTour}><Sparkles size={15} aria-hidden="true"/>ツアーをもう一度見る</button>}
-        <button type="button" className="primary-button" onClick={onClose}>閉じる</button>
+      <aside className="guide-side">
+        <p className="guide-meta">{edition === 'mac' ? 'Mac' : 'Windows'} 版 · Videe {version}</p>
+        {nav('guide-nav')}
+        {onStartTour && <button type="button" className="secondary-button guide-side-tour" onClick={onStartTour}><Sparkles size={15} aria-hidden="true"/>ツアーをもう一度見る</button>}
+      </aside>
+      <div className="guide-main">
+        <div className="guide-top"><p className="guide-meta">{edition === 'mac' ? 'Mac' : 'Windows'} 版 · Videe {version}</p>{nav('guide-toc')}</div>
+        {STEPS.map((step, index) => <section key={step.id} id={`guide-${step.id}`} className="guide-step" aria-labelledby={`guide-${step.id}-title`}>
+          <header><span className="guide-badge">STEP {index + 1}</span><h3 id={`guide-${step.id}-title`}><step.icon size={18} aria-hidden="true"/>{step.title}</h3></header>
+          <p className="guide-lead">{step.lead}</p>
+          {step.shot && <Figure shot={`${step.shot}-${edition}` as Shot} points={step.points}/>}
+          {step.points.length > 0 && <ol className="guide-points">{step.points.map((point, i) => <li key={i}><Num n={i + 1}/><span>{point.body}</span></li>)}</ol>}
+          {step.id === 'shortcuts' && <dl className="guide-shortcuts">{shortcuts(edition).map(([label, keys]) => <div key={label}><dt>{label}</dt><dd><Keys keys={keys}/></dd></div>)}</dl>}
+          {step.tip && <p className="guide-tip"><Lightbulb size={15} aria-hidden="true"/><span><b>ポイント</b>{step.tip}</span></p>}
+        </section>)}
+        <div className="guide-footer">
+          {onStartTour && <button type="button" className="secondary-button guide-footer-tour" onClick={onStartTour}><Sparkles size={15} aria-hidden="true"/>ツアーをもう一度見る</button>}
+          <button type="button" className="primary-button" onClick={onClose}>閉じる</button>
+        </div>
       </div>
     </div>
   </Modal>;

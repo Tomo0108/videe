@@ -74,6 +74,11 @@ svg { flex-shrink: 0; }
 .app-header { height: 72px; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 5; background: var(--glass); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); }
 .native-mac .app-header { padding-left: 104px; -webkit-app-region: drag; }
 .native-mac .app-header button { -webkit-app-region: no-drag; }
+/* The header's window-drag area swallows clicks even under a dialog, so a sheet's close button
+   at the top of the window would not respond on Mac. Dialogs never drag, and while one is open
+   the header stops dragging too. */
+dialog, dialog * { -webkit-app-region: no-drag; }
+.native-mac:has(dialog[open]) .app-header { -webkit-app-region: no-drag; }
 .brand { display: flex; align-items: center; gap: 10px; user-select: none; }
 .brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 2px 5px #00183820; }
 .brand span { line-height: var(--leading-title3); font-size: var(--type-title3); font-weight: 600; letter-spacing: normal; }
@@ -1320,13 +1325,37 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .setting-link-label svg { color: var(--accent) !important; }
 
 /* Quick guide: a step-by-step manual with numbered callouts on real screenshots. */
-.guide-modal { width: min(880px, calc(100% - 32px)); padding: 0; }
+.guide-modal { width: min(1100px, calc(100% - 32px)); padding: 0; }
 .guide-modal .modal-head { position: sticky; top: 0; z-index: 2; margin: 0; padding: 18px 24px 14px; background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--line); }
-.guide { --mark: #e8453c; padding: 4px 28px 28px; line-height: 1.6; }
+.guide { --mark: #e8453c; display: grid; grid-template-columns: 256px minmax(0, 1fr); line-height: 1.6; }
+.guide-main { padding: 4px 32px 28px; min-width: 0; }
+.guide-side { position: sticky; top: 64px; align-self: start; height: calc(100dvh - 40px - 64px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 20px; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--group) 45%, var(--surface)); }
+.guide-side .guide-meta { margin: 0 8px 2px; }
+.guide-nav { display: grid; gap: 2px; }
+.guide-nav button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 6px 10px 6px 6px; border-radius: 10px; text-align: left; color: var(--ink); font-size: var(--type-callout); line-height: 1.35; }
+.guide-nav button:hover { background: var(--hover); }
+.guide-nav button svg { flex: none; color: var(--muted); }
+.guide-nav button[aria-current] { background: var(--selected); color: var(--accent); font-weight: 600; }
+.guide-nav button[aria-current] svg { color: var(--accent); }
+.guide-nav-num { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: var(--type-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+.guide-nav button[aria-current] .guide-nav-num { background: var(--accent-fill); border-color: transparent; color: var(--on-accent); }
+.guide-side-tour { margin: auto 6px 0; white-space: nowrap; font-size: var(--type-callout); padding-inline: 12px; }
+.guide-top { display: none; }
+.guide-main > .guide-step:first-of-type { margin-top: 8px; border-top: 0; }
+.guide-footer-tour { display: none; }
+@media (max-width: 860px) {
+  .guide { display: block; }
+  .guide-side { display: none; }
+  .guide-top { display: block; }
+  .guide-main > .guide-step:first-of-type { margin-top: 26px; border-top: 1px solid var(--line); }
+  .guide-footer-tour { display: inline-flex; }
+}
 .guide-meta { margin: 14px 0 12px; color: var(--muted); font-size: var(--type-callout); }
 .guide-toc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.guide-toc button { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 12px 4px 5px; border-radius: 999px; background: var(--group); border: 1px solid var(--line); font-size: var(--type-callout); }
-.guide-toc button span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); color: var(--accent); font-weight: 600; font-size: var(--type-caption); font-variant-numeric: tabular-nums; }
+.guide-toc button { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 12px 4px 5px; font-size: var(--type-callout); border-radius: 999px; background: var(--group); border: 1px solid var(--line); font-size: var(--type-callout); }
+.guide-toc button svg { display: none; }
+.guide-toc .guide-nav-num { border: 0; color: var(--accent); }
+.guide-toc button[aria-current] { color: var(--accent); border-color: var(--accent); }
 .guide-toc button:hover { color: var(--accent); }
 .guide-step { padding-top: 30px; margin-top: 26px; border-top: 1px solid var(--line); scroll-margin-top: 72px; }
 .guide-step header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -1359,7 +1388,7 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .guide-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); }
 @media (max-width: 700px) {
   .guide-modal { width: 100%; max-height: 100dvh; border-radius: 18px 18px 0 0; }
-  .guide { padding: 4px 18px 24px; }
+  .guide-main { padding: 4px 18px 24px; }
   .guide-modal .modal-head { padding: 14px 18px 12px; }
   .guide-shortcuts { grid-template-columns: 1fr; }
   .guide-mark { border-width: 2px; border-radius: 5px; }

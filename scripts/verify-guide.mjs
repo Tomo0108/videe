@@ -57,7 +57,13 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await page.locator('dialog.guide-modal').evaluate(el => { el.scrollTop = 0; });
   await shot(page, `guide-top-${label}`);
   await page.getByRole('button', { name: '設定を確認する' }).click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(800);
+  if (viewport.width > 860) {
+    // The side panel stays in view and follows the step being read.
+    assert.ok(await page.locator('.guide-side').isVisible(), 'side panel on wide windows');
+    assert.match(await page.locator('.guide-nav [aria-current]').textContent(), /設定を確認する/);
+    assert.ok((await page.locator('.guide-side').boundingBox()).y < 120, 'side panel stays at the top while scrolling');
+  }
   await shot(page, `guide-settings-${label}`);
   await page.getByRole('button', { name: '再生する' }).first().click();
   await page.waitForTimeout(400);
@@ -97,13 +103,31 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await page.waitForSelector('.no-results h2');
   await page.keyboard.press('Meta+Shift+Slash');
   await page.locator('dialog.guide-modal').waitFor();
-  assert.match(await page.locator('.guide-meta').textContent(), /^Mac 版/);
+  assert.match(await page.locator('.guide-meta >> visible=true').textContent(), /^Mac 版/);
   assert.match(await page.locator('#guide-install').textContent(), /mac-arm64\.dmg/);
   const srcs = await page.locator('.guide-figure img').evaluateAll(imgs => imgs.map(img => img.getAttribute('src')));
   assert.equal(srcs.length, 5);
   assert.ok(srcs.every(src => /-mac/.test(src)), 'Mac screenshots');
   if (shotsDir) { await page.getByRole('button', { name: 'ライブラリを整理する' }).click(); await page.waitForTimeout(400); await shot(page, 'guide-library-mac'); }
   await context.close();
+}
+// Mac app: dialogs must not sit under the header's window-drag area, or their buttons stop responding.
+{
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(URL);
+  await page.waitForSelector('.no-results h2');
+  await page.evaluate(() => document.querySelector('.app-shell').classList.add('native-mac'));
+  const region = selector => page.evaluate(sel => { const style = getComputedStyle(document.querySelector(sel)); return style.getPropertyValue('-webkit-app-region') || style.webkitAppRegion || ''; }, selector);
+  const before = await region('.app-header');
+  await page.keyboard.press('F1');
+  await page.locator('dialog.guide-modal').waitFor();
+  assert.notEqual(await region('.app-header'), 'drag', 'header stops dragging while a dialog is open');
+  assert.notEqual(await region('dialog.guide-modal .modal-head [aria-label="Close"]'), 'drag');
+  await page.locator('dialog.guide-modal .modal-head [aria-label="Close"]').click();
+  await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
+  assert.equal(await region('.app-header'), before, 'header drags again after closing');
+  console.log(`app-region: header ${before || '(not exposed)'}`);
+  await page.close();
 }
 await browser.close();
 assert.deepEqual(errors, []);
