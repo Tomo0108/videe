@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.17': 'The library opens in grid view, the player zooms into the picture in steps from the controls, and each video has an Info button that gathers play, favorite, move and remove in one place.',
   '0.1.16': 'Videe now speaks Japanese: every screen, menu, dialog, message, the tour and the quick guide are in Japanese by default, and English is one switch away in Settings → Display → Language.',
   '0.1.15': 'Player controls fade out sooner and as soon as the cursor leaves the player or the window.',
   '0.1.14': 'The quick guide gains a side panel that lists every step and follows along as you read, and its close button works again in the Mac app.',
