@@ -90,6 +90,7 @@ function steps(os: Edition): Step[] {
     mac ? {body: <><b>Video decoding が Software fallback になる</b>：macOS を最新にして Videe を再起動します。<b translate="no">Hardware acceleration</b> がオンになっているかも確認してください。</>} :
     {body: <><b>Video decoding が Software fallback になる</b>：グラフィックドライバーを更新するか、Windows の <b>設定</b> → <b>システム</b> → <b>ディスプレイ</b> → <b>グラフィック</b> で Videe に「高パフォーマンス」を割り当てます。</>},
     {body: <><b>ディスクの空きが減った</b>：変換用のコピーは <b translate="no">Optimized copies</b> の <b translate="no">Clear</b> で削除できます。必要になれば自動で作り直します。</>},
+    ...(mac ? [{body: <><b>「壊れているため開けません」と表示される</b>：ターミナルで <code>xattr -cr /Applications/Videe.app</code> を実行してから開き直します。</>}] : []),
     mac ? {body: <><b>「開発元を確認できない」と表示される</b>：<b>システム設定</b> → <b>プライバシーとセキュリティ</b> の <b>このまま開く</b> で起動できます。ダウンロード元が GitHub の Videe リリースページか確認してください。<UI icon={ShieldCheck}/></>} :
     {body: <><b>SmartScreen で起動できない</b>：<b>詳細情報</b> → <b>実行</b> で起動できます。ダウンロード元が GitHub の Videe リリースページか確認してください。<UI icon={ShieldCheck}/></>},
   ]},

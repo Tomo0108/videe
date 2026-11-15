@@ -21,6 +21,14 @@ jobs:
       - run: npm run package:mac:dmg
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify the app inside the DMG is signed
+        run: |
+          set -euo pipefail
+          DMG=$(ls release/*.dmg | head -1)
+          MOUNT=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT" "$DMG"
+          codesign --verify --deep --strict --verbose=2 "$MOUNT/Videe.app"
+          hdiutil detach "$MOUNT"
       - uses: actions/upload-artifact@v4
         with:
           name: macos

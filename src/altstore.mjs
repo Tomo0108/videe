@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.11': 'The Mac app opens again: it is now signed so macOS no longer reports it as damaged. Only the open button you pressed shows a spinner while videos import.',
   '0.1.10': 'An illustrated quick guide for Windows and Mac (Help button, F1 or ⌘?) and a short first-launch tour of the key settings. Scrubbing in smooth playback no longer errors, smooth playback is remembered per video, and library menus behave better.',
   '0.1.9': 'Set Videe as the default app for videos: files opened from Finder, Explorer or the Files app now load and play right away, whether Videe is running or not.',
   '0.1.8': 'Smooth playback for any codec with live conversion like VLC, a pro editor with a frame-accurate timeline and export, and a redesigned library with folders, playlists and drag and drop.',
