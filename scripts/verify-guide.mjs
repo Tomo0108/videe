@@ -88,6 +88,23 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await tour.waitFor({ state: 'detached' });
   await page.close();
 }
+// A Mac browser (and the Mac app) gets the Mac edition with its own screenshots and ⌘? shortcut.
+{
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36', reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(`mac: ${error.message}`));
+  await page.goto(URL);
+  await page.waitForSelector('.no-results h2');
+  await page.keyboard.press('Meta+Shift+Slash');
+  await page.locator('dialog.guide-modal').waitFor();
+  assert.match(await page.locator('.guide-meta').textContent(), /^Mac 版/);
+  assert.match(await page.locator('#guide-install').textContent(), /mac-arm64\.dmg/);
+  const srcs = await page.locator('.guide-figure img').evaluateAll(imgs => imgs.map(img => img.getAttribute('src')));
+  assert.equal(srcs.length, 5);
+  assert.ok(srcs.every(src => /-mac/.test(src)), 'Mac screenshots');
+  if (shotsDir) { await page.getByRole('button', { name: 'ライブラリを整理する' }).click(); await page.waitForTimeout(400); await shot(page, 'guide-library-mac'); }
+  await context.close();
+}
 await browser.close();
 assert.deepEqual(errors, []);
 console.log('Quick guide and tour OK');

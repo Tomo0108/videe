@@ -30,3 +30,12 @@ test('blocked storage never traps people in the tour', () => {
   assert.doesNotThrow(() => markTourSeen(broken));
   assert.equal(shouldAutoStartTour({ storage: broken }), false);
 });
+
+test('the Mac app gets the Mac guide, Windows and others the Windows guide', async () => {
+  const { guideEdition } = await import('../src/onboarding.mjs');
+  assert.equal(guideEdition({ platform: 'darwin' }), 'mac');
+  assert.equal(guideEdition({ platform: 'win32', userAgent: 'Macintosh' }), 'win');
+  assert.equal(guideEdition({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' }), 'mac');
+  assert.equal(guideEdition({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }), 'win');
+  assert.equal(guideEdition({ userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile' }), 'win');
+});

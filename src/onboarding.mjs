@@ -21,3 +21,14 @@ export function shouldAutoStartTour({ storage, webdriver = false, search = '' })
   if (webdriver) return false;
   return !tourSeen(storage);
 }
+
+/**
+ * Which edition of the quick guide to show: the Mac app (or a Mac browser) gets the Mac
+ * guide, everything else the Windows one.
+ * @param {{ platform?: string, userAgent?: string }} env
+ * @returns {'mac'|'win'}
+ */
+export function guideEdition({ platform = '', userAgent = '' }) {
+  if (platform) return platform === 'darwin' ? 'mac' : 'win';
+  return /Macintosh|Mac OS X/.test(userAgent) && !/iPhone|iPad|Mobile/.test(userAgent) ? 'mac' : 'win';
+}

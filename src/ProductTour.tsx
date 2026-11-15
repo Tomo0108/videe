@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {BookOpen,FolderOpen,Settings2,Sparkles,Upload,X} from 'lucide-react';
 import type {Preferences} from './preferences.mjs';
-import {UI} from './QuickGuide';
+import {UI, currentEdition} from './QuickGuide';
 
 type Box = {left: number; top: number; width: number; height: number};
 type TourStep = {title: string; body: ReactNode; target?: () => DOMRect[]; settings?: boolean; guide?: boolean};
@@ -18,7 +18,7 @@ export function ProductTour({prefs, setPrefs, desktop, onOpenGuide, onClose}: {p
     {title: '動画を開く', target: visible('.header-actions .header-open-video, .header-actions .header-open'), body: <><UI icon={Upload}>Open video</UI> でファイルを、<UI icon={FolderOpen}>Open folder</UI> でフォルダーごと追加します。ウィンドウへのドラッグ＆ドロップでも追加できます。</>},
     {title: 'ライブラリ', target: visible('.library-sidebar nav, .library-tabs'), body: <>途中まで見た動画は <b translate="no">Continue watching</b>、お気に入りは <b translate="no">Favorites</b> にまとまります。フォルダーやプレイリストで整理もできます。</>},
     {title: '最初の設定', target: visible('.app-header [aria-label="Settings"]'), settings: true, body: <>あとから <UI icon={Settings2}>Settings</UI> でいつでも変更できます。</>},
-    {title: 'クイックガイド', target: visible('.app-header .header-help'), guide: true, body: <>画面付きの手順書はここから開けます。キーボードの <kbd>F1</kbd> でも開きます。ツアーは Settings からもう一度見られます。</>},
+    {title: 'クイックガイド', target: visible('.app-header .header-help'), guide: true, body: <>画面付きの手順書はここから開けます。キーボードの {currentEdition() === 'mac' ? <><kbd>⌘</kbd> <kbd>?</kbd></> : <kbd>F1</kbd>} でも開きます。ツアーは Settings からもう一度見られます。</>},
   ];
   const [index, setIndex] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
@@ -51,7 +51,7 @@ export function ProductTour({prefs, setPrefs, desktop, onOpenGuide, onClose}: {p
   }, [place]);
   useEffect(() => { cardRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus({focusVisible: false} as FocusOptions); }, [index]);
   const toggle = (key: 'resume' | 'autoAdvance' | 'hardware' | 'motion', label: string, note: string) => <label className="setting-row"><span>{label}<small>{note}</small></span><input type="checkbox" role="switch" aria-label={label} checked={prefs[key]} onChange={e => setPrefs({...prefs, [key]: e.target.checked})}/></label>;
-  return <dialog ref={dialog} className="tour" lang="ja" aria-labelledby="tour-title" aria-describedby="tour-body" onCancel={e => { e.preventDefault(); onClose(); }}>
+  return <dialog ref={dialog} className="tour" aria-labelledby="tour-title" aria-describedby="tour-body" onCancel={e => { e.preventDefault(); onClose(); }}>
     <div className={`tour-spot${box ? '' : ' none'}`} style={box ? {left: box.left, top: box.top, width: box.width, height: box.height} : undefined} aria-hidden="true"/>
     <div ref={cardRef} className={`tour-card${card ? ' anchored' : ''}`} style={card ? {left: card.left, top: card.top} : undefined} key={index}>
       <div className="tour-head">

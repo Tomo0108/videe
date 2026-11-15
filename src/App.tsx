@@ -21,7 +21,7 @@ import { EditorPanel, ExportDialog, newSegmentId, type Segment } from './Editor'
 import { Sidebar, type View } from './Sidebar';
 import { VideoCard, FolderCard, type CardActions } from './VideoCard';
 import type { Analysis, ExportOptions } from './env';
-import { QuickGuide } from './QuickGuide';
+import { QuickGuide, currentEdition, isGuideShortcut } from './QuickGuide';
 import { ProductTour } from './ProductTour';
 import { markTourSeen, shouldAutoStartTour } from './onboarding.mjs';
 
@@ -140,7 +140,7 @@ export default function App() {
   const closeTour = useCallback(() => { try { markTourSeen(localStorage); } catch { /* Shows again next launch. */ } setTourOpen(false); }, []);
   const startTour = useCallback(() => { setModal(null); setTourOpen(true); }, []);
   useEffect(() => {
-    const help = (e: KeyboardEvent) => { if (e.key !== 'F1' || e.repeat) return; e.preventDefault(); setTourOpen(false); setModal(current => current === 'guide' ? current : 'guide'); };
+    const help = (e: KeyboardEvent) => { if (!isGuideShortcut(e) || e.repeat) return; e.preventDefault(); setTourOpen(false); setModal(current => current === 'guide' ? current : 'guide'); };
     window.addEventListener('keydown', help);
     return () => window.removeEventListener('keydown', help);
   }, []);
@@ -1134,7 +1134,7 @@ export default function App() {
       <SecuritySettings/>
       <section className="settings-section" aria-label="About"><h3>About</h3><div className="settings-group">
         <div className="setting-row app-about"><img src="./icon.png" width="40" height="40" alt=""/><div><strong translate="no">Videe</strong><span>Version {appPackage.version}</span></div></div>
-        <button type="button" className="setting-row setting-link" onClick={() => setModal('guide')}><span><span className="setting-link-label"><BookOpen size={16} aria-hidden="true"/>Quick guide</span><small>Illustrated steps for Windows · F1</small></span><ChevronRight size={16} aria-hidden="true"/></button>
+        <button type="button" className="setting-row setting-link" onClick={() => setModal('guide')}><span><span className="setting-link-label"><BookOpen size={16} aria-hidden="true"/>Quick guide</span><small>{currentEdition() === 'mac' ? 'Illustrated steps for Mac · ⌘?' : 'Illustrated steps for Windows · F1'}</small></span><ChevronRight size={16} aria-hidden="true"/></button>
         <button type="button" className="setting-row setting-link" onClick={startTour}><span><span className="setting-link-label"><Sparkles size={16} aria-hidden="true"/>Take the tour</span><small>Key settings and where things are</small></span><ChevronRight size={16} aria-hidden="true"/></button>
         {!nativeShell && <a className="setting-row setting-link" href={siteHref}><span>Get the app</span><ChevronRight size={16} aria-hidden="true"/></a>}
         <details className="setting-disclosure help-details"><summary><span>Shortcuts</span><ChevronRight size={16} aria-hidden="true"/></summary><div className="shortcuts">{([['Play / pause',['space','K']],['Seek',['left','right']],['Volume',['up','down']],['Jump',['0–9']],['Start / end',['Home','End']],['Speed',['[',']']],['Frame',[',','.']],['Full screen',['F']],['Mute',['M']],['Subtitles',['C']],['Save frame',['⇧','S']],['Editor',['E']],['Mark in / out',['I','O']],['Split',['S']],['Undo',['⌘/Ctrl','Z']],['Exit full screen',['esc']]] as const).map(([label,keys]) => <div key={label}><span>{label}</span><span className="shortcut-keys"><ShortcutKeys keys={[...keys]}/></span></div>)}</div></details>
