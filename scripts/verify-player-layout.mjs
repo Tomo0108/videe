@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 const browser = await chromium.launch({ channel: 'chromium', headless: true });
 const page = await browser.newPage({ viewport: { width: 3840, height: 2160 } });
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.waitForFunction(() => !document.querySelector('.header-open')?.disabled);
   await page.locator('input[type=file]').first().setInputFiles(resolve('tests/fixtures/sample.mp4'));
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 2);

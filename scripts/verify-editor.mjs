@@ -6,7 +6,7 @@ const page=await browser.newPage({viewport:{width:1280,height:900}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
- await page.goto('http://127.0.0.1:5173');
+ await page.goto('http://127.0.0.1:5173/?lang=en');
  const buffer=await readFile('tests/fixtures/sample.mp4');
  await page.locator('input[type=file]').first().setInputFiles([{name:'First.mp4',mimeType:'video/mp4',buffer}]);
  await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);

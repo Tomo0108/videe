@@ -1,5 +1,5 @@
 import { DEFAULT_DIR, normalizeDir, normalizeSort } from './library-sort.mjs';
-/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', sortDir: 'asc'|'desc', motion: boolean, smooth: 'auto'|'off', hardware: boolean, sidebar: 'expanded'|'collapsed', timeDisplay: 'elapsed'|'remaining', timecode: boolean }} Preferences */
+/** @typedef {{ resume: boolean, autoplay: boolean, autoAdvance: boolean, repeat: 'off'|'one'|'all', speed: number, volume: number, theme: 'system'|'light'|'dark', layout: 'grid'|'list', sort: 'recent'|'name'|'duration'|'size', sortDir: 'asc'|'desc', motion: boolean, smooth: 'auto'|'off', hardware: boolean, sidebar: 'expanded'|'collapsed', timeDisplay: 'elapsed'|'remaining', timecode: boolean, language: 'ja'|'en' }} Preferences */
 export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 /** @param {number} current @param {-1|1} direction */
 export function stepSpeed(current, direction) {
@@ -8,7 +8,7 @@ export function stepSpeed(current, direction) {
   return SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, index + direction))];
 }
 /** @type {Preferences} */
-export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'list', sort: 'recent', sortDir: DEFAULT_DIR.recent, motion: true, smooth: 'auto', hardware: true, sidebar: 'expanded', timeDisplay: 'elapsed', timecode: false };
+export const defaults = { resume: true, autoplay: true, autoAdvance: true, repeat: 'off', speed: 1, volume: 0.8, theme: 'system', layout: 'list', sort: 'recent', sortDir: DEFAULT_DIR.recent, motion: true, smooth: 'auto', hardware: true, sidebar: 'expanded', timeDisplay: 'elapsed', timecode: false, language: 'ja' };
 /** Validate persisted settings, including migration from the original autoplay setting.
  * @param {unknown} value
  * @returns {Preferences}
@@ -34,6 +34,7 @@ export function normalizePreferences(value) {
   if (data.sidebar === 'expanded' || data.sidebar === 'collapsed') result.sidebar = data.sidebar;
   if (data.timeDisplay === 'elapsed' || data.timeDisplay === 'remaining') result.timeDisplay = data.timeDisplay;
   if (typeof data.timecode === 'boolean') result.timecode = data.timecode;
+  if (data.language === 'ja' || data.language === 'en') result.language = data.language;
   return result;
 }
 /** @param {number} index @param {number} length @param {Preferences['repeat']} repeat @param {boolean} autoAdvance */

@@ -5,7 +5,7 @@ const browser = await chromium.launch({channel:'chromium',headless:true});
 try {
  const page = await browser.newPage({viewport:{width:1280,height:900}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5173');
+ await page.goto('http://127.0.0.1:5173/?lang=en');
  await page.locator('input[type=file]').first().setInputFiles({name:'Continuity.mp4',mimeType:'video/mp4',buffer:await readFile('tests/fixtures/sample.mp4')});
  await page.waitForFunction(()=>document.querySelector('.player-view video')?.readyState>=2);
  await page.evaluate(async()=>{

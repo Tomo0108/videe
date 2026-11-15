@@ -29,7 +29,7 @@ const libraryCount = 40;
 
 async function launch(userData) {
   const start = performance.now();
-  const app = await electron.launch({ args: ['.'], env: { ...process.env, VIDEE_TEST_USER_DATA: userData } });
+  const app = await electron.launch({ args: ['.'], env: { ...process.env, VIDEE_TEST_USER_DATA: userData, VIDEE_LANG: 'en' } });
   const page = await app.firstWindow();
   await page.waitForFunction(() => document.querySelector('.header-open') && !document.querySelector('.header-open').disabled);
   return { app, page, startup: ms(start) };

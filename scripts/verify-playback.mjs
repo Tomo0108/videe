@@ -16,7 +16,7 @@ const settings=async (repeat,advance=false)=>{
 const loaded=()=>page.waitForFunction(()=>document.querySelector('.player-view video')?.readyState>=2);
 const finish=async()=>{await loaded();await page.locator(".player-view video").evaluate(async v=>{v.currentTime=v.duration-0.2;await v.play();});};
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await settings('one');
   const buffer=await readFile('tests/fixtures/sample.mp4');
   await page.locator('input[type=file]').first().setInputFiles([{name:'First.mp4',mimeType:'video/mp4',buffer},{name:'Second.mp4',mimeType:'video/mp4',buffer}]);

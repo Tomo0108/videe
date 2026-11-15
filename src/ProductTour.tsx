@@ -2,23 +2,35 @@ import {useCallback,useEffect,useLayoutEffect,useRef,useState,type ReactNode} fr
 import {BookOpen,FolderOpen,Settings2,Sparkles,Upload,X} from 'lucide-react';
 import type {Preferences} from './preferences.mjs';
 import {UI, currentEdition} from './QuickGuide';
+import {getLanguage,t} from './i18n.mjs';
 
 type Box = {left: number; top: number; width: number; height: number};
 type TourStep = {title: string; body: ReactNode; target?: () => DOMRect[]; settings?: boolean; guide?: boolean};
 /** Boxes of the visible elements matching `selector`; the spotlight wraps them all. */
 const visible = (selector: string) => () => [...document.querySelectorAll(selector)].map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+const OPEN = visible('.header-actions .header-open-video, .header-actions .header-open');
+const LIBRARY = visible('.library-sidebar nav, .library-tabs');
+const SETTINGS = visible('.app-header .header-settings');
+const GUIDE = visible('.app-header .header-help');
 
 /**
  * First-launch walkthrough: points at the controls people need first, lets them set the
  * key preferences in place, and hands off to the quick guide. Skippable at every step.
  */
 export function ProductTour({prefs, setPrefs, desktop, onOpenGuide, onClose}: {prefs: Preferences; setPrefs: (next: Preferences) => void; desktop: boolean; onOpenGuide: () => void; onClose: () => void}) {
-  const steps: TourStep[] = [
+  const guideKeys = currentEdition() === 'mac' ? <><kbd>⌘</kbd> <kbd>?</kbd></> : <kbd>F1</kbd>;
+  const steps: TourStep[] = getLanguage() === 'ja' ? [
     {title: 'Videe へようこそ', body: <>パソコンにある動画を、そのまま快適に再生できるプレイヤーです。1 分ほどで、主な使い方と最初に決めておきたい設定を確認しましょう。</>},
-    {title: '動画を開く', target: visible('.header-actions .header-open-video, .header-actions .header-open'), body: <><UI icon={Upload}>Open video</UI> でファイルを、<UI icon={FolderOpen}>Open folder</UI> でフォルダーごと追加します。ウィンドウへのドラッグ＆ドロップでも追加できます。</>},
-    {title: 'ライブラリ', target: visible('.library-sidebar nav, .library-tabs'), body: <>途中まで見た動画は <b translate="no">Continue watching</b>、お気に入りは <b translate="no">Favorites</b> にまとまります。フォルダーやプレイリストで整理もできます。</>},
-    {title: '最初の設定', target: visible('.app-header [aria-label="Settings"]'), settings: true, body: <>あとから <UI icon={Settings2}>Settings</UI> でいつでも変更できます。</>},
-    {title: 'クイックガイド', target: visible('.app-header .header-help'), guide: true, body: <>画面付きの手順書はここから開けます。キーボードの {currentEdition() === 'mac' ? <><kbd>⌘</kbd> <kbd>?</kbd></> : <kbd>F1</kbd>} でも開きます。ツアーは Settings からもう一度見られます。</>},
+    {title: '動画を開く', target: OPEN, body: <><UI icon={Upload}>{t('Open video')}</UI> でファイルを、<UI icon={FolderOpen}>{t('Open folder')}</UI> でフォルダーごと追加します。ウィンドウへのドラッグ＆ドロップでも追加できます。</>},
+    {title: 'ライブラリ', target: LIBRARY, body: <>途中まで見た動画は <b>{t('Continue watching')}</b>、お気に入りは <b>{t('Favorites')}</b> にまとまります。フォルダーやプレイリストで整理もできます。</>},
+    {title: '最初の設定', target: SETTINGS, settings: true, body: <>あとから <UI icon={Settings2}>{t('Settings')}</UI> でいつでも変更できます。</>},
+    {title: 'クイックガイド', target: GUIDE, guide: true, body: <>画面付きの手順書はここから開けます。キーボードの {guideKeys} でも開きます。ツアーは{t('Settings')}からもう一度見られます。</>},
+  ] : [
+    {title: 'Welcome to Videe', body: <>A player that plays the videos on your computer as they are, smoothly. Take a minute to see the basics and choose the settings worth deciding first.</>},
+    {title: 'Open videos', target: OPEN, body: <><UI icon={Upload}>{t('Open video')}</UI> adds files and <UI icon={FolderOpen}>{t('Open folder')}</UI> a whole folder. You can also drag them onto the window.</>},
+    {title: 'Library', target: LIBRARY, body: <>Videos you stopped partway gather in <b>{t('Continue watching')}</b>, favorites in <b>{t('Favorites')}</b>. Folders and playlists keep things organized.</>},
+    {title: 'First settings', target: SETTINGS, settings: true, body: <>You can change these any time in <UI icon={Settings2}>{t('Settings')}</UI>.</>},
+    {title: 'Quick guide', target: GUIDE, guide: true, body: <>Illustrated instructions open from here, or with {guideKeys} on the keyboard. You can take this tour again from Settings.</>},
   ];
   const [index, setIndex] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
@@ -55,23 +67,23 @@ export function ProductTour({prefs, setPrefs, desktop, onOpenGuide, onClose}: {p
     <div className={`tour-spot${box ? '' : ' none'}`} style={box ? {left: box.left, top: box.top, width: box.width, height: box.height} : undefined} aria-hidden="true"/>
     <div ref={cardRef} className={`tour-card${card ? ' anchored' : ''}`} style={card ? {left: card.left, top: card.top} : undefined} key={index}>
       <div className="tour-head">
-        <span className="tour-progress" aria-label={`${steps.length} ステップ中 ${index + 1}`}>{steps.map((_, i) => <i key={i} className={i === index ? 'on' : i < index ? 'done' : ''}/>)}</span>
-        <button type="button" className="icon-button tour-skip" aria-label="ツアーを閉じる" title="ツアーを閉じる" onClick={onClose}><X size={16} aria-hidden="true"/></button>
+        <span className="tour-progress" aria-label={t('Step {n} of {total}', {n: index + 1, total: steps.length})}>{steps.map((_, i) => <i key={i} className={i === index ? 'on' : i < index ? 'done' : ''}/>)}</span>
+        <button type="button" className="icon-button tour-skip" aria-label={t('Close tour')} title={t('Close tour')} onClick={onClose}><X size={16} aria-hidden="true"/></button>
       </div>
       {index === 0 && <span className="tour-hero" aria-hidden="true"><img src="./icon.png" width="44" height="44" alt=""/></span>}
       <h2 id="tour-title">{step.title}</h2>
       <p id="tour-body">{step.body}</p>
       {step.settings && <div className="settings-group tour-settings">
-        <label className="setting-row"><span>外観<small>Appearance</small></span><select aria-label="外観" value={prefs.theme} onChange={e => setPrefs({...prefs, theme: e.target.value as Preferences['theme']})}><option value="system">システムに合わせる</option><option value="light">ライト</option><option value="dark">ダーク</option></select></label>
-        {toggle('resume', '続きから再生', '前回止めた位置から再生します')}
-        {toggle('autoAdvance', '次の動画を自動再生', '終わったら一覧の次の動画へ')}
-        {desktop && toggle('hardware', 'ハードウェアアクセラレーション', 'GPU で再生と変換を行います')}
-        {toggle('motion', 'アニメーション', '画面切り替えの動き')}
+        <label className="setting-row"><span>{t('Appearance')}</span><select aria-label={t('Appearance')} value={prefs.theme} onChange={e => setPrefs({...prefs, theme: e.target.value as Preferences['theme']})}><option value="system">{t('System')}</option><option value="light">{t('Light')}</option><option value="dark">{t('Dark')}</option></select></label>
+        {toggle('resume', t('Resume playback'), t('Start where you stopped last time'))}
+        {toggle('autoAdvance', t('Autoplay next'), t('Go on to the next video in the list'))}
+        {desktop && toggle('hardware', t('Hardware acceleration'), t('Play and convert video with the GPU'))}
+        {toggle('motion', t('Animations'), t('Motion between screens'))}
       </div>}
-      {step.guide && <button type="button" className="secondary-button tour-guide" onClick={onOpenGuide}><BookOpen size={16} aria-hidden="true"/>クイックガイドを開く</button>}
+      {step.guide && <button type="button" className="secondary-button tour-guide" onClick={onOpenGuide}><BookOpen size={16} aria-hidden="true"/>{t('Open the quick guide')}</button>}
       <div className="tour-actions">
-        {index === 0 ? <button type="button" className="secondary-button" onClick={onClose}>スキップ</button> : <button type="button" className="secondary-button" onClick={() => setIndex(index - 1)}>戻る</button>}
-        <button type="button" className="primary-button" data-autofocus onClick={() => last ? onClose() : setIndex(index + 1)}>{index === 0 ? <><Sparkles size={15} aria-hidden="true"/>はじめる</> : last ? '完了' : '次へ'}</button>
+        {index === 0 ? <button type="button" className="secondary-button" onClick={onClose}>{t('Skip')}</button> : <button type="button" className="secondary-button" onClick={() => setIndex(index - 1)}>{t('Back')}</button>}
+        <button type="button" className="primary-button" data-autofocus onClick={() => last ? onClose() : setIndex(index + 1)}>{index === 0 ? <><Sparkles size={15} aria-hidden="true"/>{t('Get started')}</> : last ? t('Done') : t('Next')}</button>
       </div>
     </div>
   </dialog>;

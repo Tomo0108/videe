@@ -13,7 +13,7 @@ if (mux.status !== 0) throw new Error((mux.stderr || '').slice(-2000));
 const browser = await chromium.launch({ channel: 'chromium', headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 850 } });
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.waitForFunction(() => !document.querySelector('.header-open')?.disabled);
   await page.locator('input[type=file]').first().setInputFiles(muxed);
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 2);

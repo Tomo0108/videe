@@ -7,7 +7,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 940 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.getByRole('button', { name: 'Open folder', exact: true }).waitFor();
   await page.locator('input[type=file]').first().setInputFiles(resolve('tests/fixtures/sample.mp4'));
   await page.waitForFunction(() => document.querySelector('.player-view video')?.readyState >= 2);

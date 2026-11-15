@@ -68,7 +68,7 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await page.getByRole('button', { name: '再生する' }).first().click();
   await page.waitForTimeout(400);
   await shot(page, `guide-play-${label}`);
-  await page.locator('dialog.guide-modal .modal-head [aria-label="Close"]').click();
+  await page.locator('dialog.guide-modal .modal-head [aria-label="閉じる"]').click();
   await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
 
   // Seen: no tour on the next normal launch even outside automation logic.
@@ -83,12 +83,12 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
 
   // Header help button and Settings rows reopen both.
-  await page.getByRole('button', { name: 'Quick guide' }).first().click();
+  await page.getByRole('button', { name: 'クイックガイド' }).first().click();
   await page.locator('dialog.guide-modal').waitFor();
   await page.keyboard.press('Escape');
   await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
-  await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByRole('button', { name: /Take the tour/ }).click();
+  await page.getByRole('button', { name: '設定', exact: true }).click();
+  await page.getByRole('button', { name: /ツアーを見る/ }).click();
   await tour.waitFor();
   await page.keyboard.press('Escape');
   await tour.waitFor({ state: 'detached' });
@@ -107,9 +107,28 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   assert.match(await page.locator('#guide-install').textContent(), /mac-arm64\.dmg/);
   const srcs = await page.locator('.guide-figure img').evaluateAll(imgs => imgs.map(img => img.getAttribute('src')));
   assert.equal(srcs.length, 5);
-  assert.ok(srcs.every(src => /-mac/.test(src)), 'Mac screenshots');
+  assert.ok(srcs.every(src => /-mac-ja/.test(src)), 'Mac screenshots of the Japanese UI');
   if (shotsDir) { await page.getByRole('button', { name: 'ライブラリを整理する' }).click(); await page.waitForTimeout(400); await shot(page, 'guide-library-mac'); }
   await context.close();
+}
+// English UI: the tour and the guide are in English too, with screenshots of the English UI.
+{
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  page.on('pageerror', error => errors.push(`english: ${error.message}`));
+  await page.goto(`${URL}/?lang=en&tour`);
+  const tour = page.locator('dialog.tour');
+  await tour.waitFor();
+  assert.equal(await tour.locator('h2').textContent(), 'Welcome to Videe');
+  await tour.getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Quick guide' }).first().click();
+  await page.locator('dialog.guide-modal').waitFor();
+  assert.match(await page.locator('.guide-meta >> visible=true').textContent(), /^Windows edition/);
+  assert.match(await page.locator('#guide-open').textContent(), /Open video/);
+  const srcs = await page.locator('.guide-figure img').evaluateAll(imgs => imgs.map(img => img.getAttribute('src')));
+  assert.equal(srcs.length, 5);
+  assert.ok(srcs.every(src => /-win-en/.test(src)), 'Windows screenshots of the English UI');
+  await shot(page, 'guide-top-english');
+  await page.close();
 }
 // Mac app: dialogs must not sit under the header's window-drag area, or their buttons stop responding.
 {
@@ -122,8 +141,8 @@ for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 
   await page.keyboard.press('F1');
   await page.locator('dialog.guide-modal').waitFor();
   assert.notEqual(await region('.app-header'), 'drag', 'header stops dragging while a dialog is open');
-  assert.notEqual(await region('dialog.guide-modal .modal-head [aria-label="Close"]'), 'drag');
-  await page.locator('dialog.guide-modal .modal-head [aria-label="Close"]').click();
+  assert.notEqual(await region('dialog.guide-modal .modal-head [aria-label="閉じる"]'), 'drag');
+  await page.locator('dialog.guide-modal .modal-head [aria-label="閉じる"]').click();
   await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
   assert.equal(await region('.app-header'), before, 'header drags again after closing');
   console.log(`app-region: header ${before || '(not exposed)'}`);

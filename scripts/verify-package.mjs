@@ -7,7 +7,7 @@ const userData=mkdtempSync('/tmp/videe-package-test-');
 const bundle=resolve('release/mac-arm64/Videe.app/Contents');
 const iconName=execFileSync('/usr/bin/plutil',['-extract','CFBundleIconFile','raw','-o','-',bundle+'/Info.plist'],{encoding:'utf8'}).trim();
 assert.deepEqual(readFileSync(bundle+'/Resources/'+iconName),readFileSync('public/icons/Videe.icns'));
-const app = await electron.launch({ executablePath:resolve('release/mac-arm64/Videe.app/Contents/MacOS/Videe'),args:[`--user-data-dir=${userData}`] });
+const app = await electron.launch({ executablePath:resolve('release/mac-arm64/Videe.app/Contents/MacOS/Videe'),args:[`--user-data-dir=${userData}`],env:{...process.env,VIDEE_LANG:'en'} });
 try {
   const page=await app.firstWindow();
   await page.locator('.brand').waitFor();

@@ -12,7 +12,7 @@ try {
   r.onupgradeneeded=()=>r.result.createObjectStore('videos',{keyPath:'id'});
   r.onsuccess=()=>{const db=r.result;const tx=db.transaction('videos','readwrite');tx.objectStore('videos').put({id:'legacy',name:'Legacy.mp4',size:bytes.length,type:'video/mp4',added:1,duration:12,position:3,favorite:true,lastPlayed:1,blob:new Blob([new Uint8Array(bytes)],{type:'video/mp4'})});tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};r.onerror=()=>reject(r.error);
  }),bytes);
- await page.goto('http://127.0.0.1:5173');
+ await page.goto('http://127.0.0.1:5173/?lang=en');
  await page.getByRole('button',{name:'Play Legacy.mp4'}).waitFor();
  const inspect=()=>page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('videe-library');r.onsuccess=()=>{const db=r.result;const tx=db.transaction(['videos','media','progress']);let videos,media,progress;tx.objectStore('progress').getAll().onsuccess=e=>progress=e.target.result;tx.objectStore('videos').getAll().onsuccess=e=>videos=e.target.result;tx.objectStore('media').getAll().onsuccess=e=>media=e.target.result;tx.oncomplete=()=>{db.close();resolve({version:db.version,videos:videos.map(v=>({id:v.id,position:progress.find(p=>p.id===v.id)?.position??v.position,favorite:v.favorite,blob:!!v.blob})),media:media.map(v=>({id:v.id,size:v.blob.size}))});};tx.onerror=()=>reject(tx.error);};}));
  let result=await inspect();assert.equal(result.version,3);assert.deepEqual(result.videos,[{id:'legacy',position:3,favorite:true,blob:false}]);assert.equal(result.media[0].size,bytes.length);

@@ -3,6 +3,7 @@ import {ArrowLeftToLine,ArrowRightToLine,Download,Eye,Loader2,Magnet,Play,Redo2,
 import {Modal} from './Modal';
 import {normalizeSegments,parseTimecode,segmentsDuration,timeLabel,timecode} from './media.mjs';
 import type {ExportOptions} from './env';
+import {t} from './i18n.mjs';
 
 export type Segment = {id:string;start:number;end:number};
 
@@ -109,22 +110,22 @@ function Timeline({duration,position,segments,selected,filmstrip,fps,snap,onSeek
   }, [segments, duration]);
   return <div className="timeline">
     <div className="timeline-tools">
-      <div className="timeline-zoom" role="group" aria-label="Timeline zoom">
-        <button type="button" className="icon-button" aria-label="Zoom out timeline" title="Zoom out (Ctrl + wheel)" disabled={zoom <= 1} onClick={() => setZoomAround(zoom / 1.6, position)}><ZoomOut size={16} aria-hidden="true"/></button>
-        <input type="range" aria-label="Timeline zoom level" min="0" max="1" step="0.01" value={Math.log(zoom) / Math.log(Math.max(1.0001, duration * fps / 40))} onChange={e => setZoomAround(Math.pow(Math.max(1.0001, duration * fps / 40), Number(e.target.value)), position)}/>
-        <button type="button" className="icon-button" aria-label="Zoom in timeline" title="Zoom in (Ctrl + wheel)" onClick={() => setZoomAround(zoom * 1.6, position)}><ZoomIn size={16} aria-hidden="true"/></button>
-        {zoom > 1 && <button type="button" className="text-button" onClick={() => { setZoom(1); setViewStart(0); }}>Fit</button>}
+      <div className="timeline-zoom" role="group" aria-label={t('Timeline zoom')}>
+        <button type="button" className="icon-button" aria-label={t('Zoom out timeline')} title={t('Zoom out (Ctrl + wheel)')} disabled={zoom <= 1} onClick={() => setZoomAround(zoom / 1.6, position)}><ZoomOut size={16} aria-hidden="true"/></button>
+        <input type="range" aria-label={t('Timeline zoom level')} min="0" max="1" step="0.01" value={Math.log(zoom) / Math.log(Math.max(1.0001, duration * fps / 40))} onChange={e => setZoomAround(Math.pow(Math.max(1.0001, duration * fps / 40), Number(e.target.value)), position)}/>
+        <button type="button" className="icon-button" aria-label={t('Zoom in timeline')} title={t('Zoom in (Ctrl + wheel)')} onClick={() => setZoomAround(zoom * 1.6, position)}><ZoomIn size={16} aria-hidden="true"/></button>
+        {zoom > 1 && <button type="button" className="text-button" onClick={() => { setZoom(1); setViewStart(0); }}>{t('Fit')}</button>}
       </div>
     </div>
-    <div className="timeline-frame" ref={frameRef} onWheel={onWheel} onPointerDown={event => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} role="slider" aria-label="Timeline" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={position} aria-valuetext={timecode(position, fps)} tabIndex={0}>
+    <div className="timeline-frame" ref={frameRef} onWheel={onWheel} onPointerDown={event => pointerDown(event)} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} role="slider" aria-label={t('Timeline')} aria-valuemin={0} aria-valuemax={duration} aria-valuenow={position} aria-valuetext={timecode(position, fps)} tabIndex={0}>
       <div className="timeline-inner" style={inner}>
         <div className="timeline-ruler">{ticks.map(t => <span key={t} className="timeline-tick" style={{left:`${pct(t)}%`}}><span>{tickLabel(t)}</span></span>)}</div>
         <div className="timeline-strip">{filmstrip.length ? filmstrip.map((frame, index) => <span key={index} style={frame ? {backgroundImage:`url(${frame})`} : undefined}/>) : <span className="timeline-strip-empty"/>}</div>
         {gaps.length > 0 && <div className="timeline-dim" aria-hidden="true">{gaps.map(([from, to]) => <span key={from} style={{left:`${pct(from)}%`,width:`${pct(to - from)}%`}}/>)}</div>}
         <div className="timeline-segments">{kept.map((segment, index) => <div key={segment.id} className={`timeline-segment${segment.id === selected ? ' selected' : ''}`} style={{left:`${pct(segment.start)}%`,width:`${pct(segment.end - segment.start)}%`}} onPointerDown={event => pointerDown(event, {kind:'move',segment})}>
           <span className="segment-label">{index + 1}</span>
-          <span className="segment-handle start" aria-label={`Segment ${index + 1} start`} onPointerDown={event => pointerDown(event, {kind:'start',segment})}/>
-          <span className="segment-handle end" aria-label={`Segment ${index + 1} end`} onPointerDown={event => pointerDown(event, {kind:'end',segment})}/>
+          <span className="segment-handle start" aria-label={t('Segment {n} start', {n: index + 1})} onPointerDown={event => pointerDown(event, {kind:'start',segment})}/>
+          <span className="segment-handle end" aria-label={t('Segment {n} end', {n: index + 1})} onPointerDown={event => pointerDown(event, {kind:'end',segment})}/>
         </div>)}</div>
         <div className="timeline-playhead" style={{left:`${pct(position)}%`}} aria-hidden="true"/>
       </div>
@@ -159,45 +160,45 @@ export function EditorPanel(props:EditorProps) {
   const {duration,position,fps,segments,selected,job} = props;
   const output = segmentsDuration(segments, duration);
   const percent = job && job.total ? Math.min(100, job.seconds / job.total * 100) : 0;
-  return <section className="editor-panel" aria-label="Editor">
+  return <section className="editor-panel" aria-label={t('Editor')}>
     <div className="editor-toolbar">
-      <div className="editor-group" role="group" aria-label="Marks">
-        <button type="button" className="tool-button" onClick={props.onMarkIn} title="Set start (I)"><ArrowLeftToLine size={16} aria-hidden="true"/><span>Mark in</span><kbd>I</kbd></button>
-        <button type="button" className="tool-button" onClick={props.onMarkOut} title="Set end (O)"><ArrowRightToLine size={16} aria-hidden="true"/><span>Mark out</span><kbd>O</kbd></button>
-        <button type="button" className="tool-button" onClick={props.onSplit} title="Split at playhead (S)"><SquareSplitHorizontal size={16} aria-hidden="true"/><span>Split</span><kbd>S</kbd></button>
-        <button type="button" className="tool-button danger" onClick={props.onDelete} disabled={!selected} title="Delete segment (Delete)"><Trash2 size={16} aria-hidden="true"/><span>Delete segment</span></button>
+      <div className="editor-group" role="group" aria-label={t('Marks')}>
+        <button type="button" className="tool-button" onClick={props.onMarkIn} title={t('Set start (I)')}><ArrowLeftToLine size={16} aria-hidden="true"/><span>{t('Mark in')}</span><kbd>I</kbd></button>
+        <button type="button" className="tool-button" onClick={props.onMarkOut} title={t('Set end (O)')}><ArrowRightToLine size={16} aria-hidden="true"/><span>{t('Mark out')}</span><kbd>O</kbd></button>
+        <button type="button" className="tool-button" onClick={props.onSplit} title={t('Split at playhead (S)')}><SquareSplitHorizontal size={16} aria-hidden="true"/><span>{t('Split')}</span><kbd>S</kbd></button>
+        <button type="button" className="tool-button danger" onClick={props.onDelete} disabled={!selected} title={t('Delete segment (Delete)')}><Trash2 size={16} aria-hidden="true"/><span>{t('Delete segment')}</span></button>
       </div>
-      <div className="editor-group" role="group" aria-label="Edit history">
-        <button type="button" className="icon-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!props.canUndo} onClick={props.onUndo}><Undo2 size={16} aria-hidden="true"/></button>
-        <button type="button" className="icon-button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={!props.canRedo} onClick={props.onRedo}><Redo2 size={16} aria-hidden="true"/></button>
-        <button type="button" className={`icon-button${props.snap ? ' active' : ''}`} aria-label="Snap to marks" aria-pressed={props.snap} title="Snap to marks" onClick={props.onToggleSnap}><Magnet size={16} aria-hidden="true"/></button>
-        <button type="button" className={`icon-button${props.preview ? ' active' : ''}`} aria-label="Preview edit" aria-pressed={props.preview} title="Preview: skip removed parts" disabled={!segments.length} onClick={props.onTogglePreview}><Eye size={16} aria-hidden="true"/></button>
+      <div className="editor-group" role="group" aria-label={t('Edit history')}>
+        <button type="button" className="icon-button" aria-label={t('Undo')} title={t('Undo (Ctrl+Z)')} disabled={!props.canUndo} onClick={props.onUndo}><Undo2 size={16} aria-hidden="true"/></button>
+        <button type="button" className="icon-button" aria-label={t('Redo')} title={t('Redo (Ctrl+Shift+Z)')} disabled={!props.canRedo} onClick={props.onRedo}><Redo2 size={16} aria-hidden="true"/></button>
+        <button type="button" className={`icon-button${props.snap ? ' active' : ''}`} aria-label={t('Snap to marks')} aria-pressed={props.snap} title={t('Snap to marks')} onClick={props.onToggleSnap}><Magnet size={16} aria-hidden="true"/></button>
+        <button type="button" className={`icon-button${props.preview ? ' active' : ''}`} aria-label={t('Preview edit')} aria-pressed={props.preview} title={t('Preview: skip removed parts')} disabled={!segments.length} onClick={props.onTogglePreview}><Eye size={16} aria-hidden="true"/></button>
       </div>
       <div className="editor-summary">
-        <span className="editor-timecode" aria-label="Playhead timecode">{timecode(position, fps)}</span>
-        <span className="editor-output">Output {timeLabel(output)}{segments.length ? ` · ${segments.length} ${segments.length === 1 ? 'segment' : 'segments'}` : ''}</span>
+        <span className="editor-timecode" aria-label={t('Playhead timecode')}>{timecode(position, fps)}</span>
+        <span className="editor-output">{t('Output {time}', {time: timeLabel(output)})}{segments.length ? ` · ${t(segments.length === 1 ? '1 segment' : '{n} segments', {n: segments.length})}` : ''}</span>
       </div>
       <div className="editor-group editor-end">
-        {segments.length > 0 && <button type="button" className="text-button" onClick={props.onReset}>Reset</button>}
-        <button type="button" className="primary-button editor-export" disabled={!!job || !duration} onClick={props.onExport}><Download size={16} aria-hidden="true"/>Export…</button>
-        <button type="button" className="icon-button" aria-label="Close editor" title="Close editor (E)" onClick={props.onClose}><X size={17} aria-hidden="true"/></button>
+        {segments.length > 0 && <button type="button" className="text-button" onClick={props.onReset}>{t('Reset')}</button>}
+        <button type="button" className="primary-button editor-export" disabled={!!job || !duration} onClick={props.onExport}><Download size={16} aria-hidden="true"/>{t('Export…')}</button>
+        <button type="button" className="icon-button" aria-label={t('Close editor')} title={t('Close editor (E)')} onClick={props.onClose}><X size={17} aria-hidden="true"/></button>
       </div>
     </div>
     <Timeline duration={duration} position={position} segments={segments} selected={selected} filmstrip={props.filmstrip} fps={fps} snap={props.snap} onSeek={props.onSeek} onChange={props.onChange} onSelect={props.onSelect} onCommit={() => props.onCommit()}/>
-    {job && <div className="editor-job" role="status"><Loader2 size={16} className="spin" aria-hidden="true"/><span>Exporting · {Math.round(percent)}%</span><progress max={100} value={percent}/><button type="button" className="secondary-button" onClick={props.onCancelJob}>Cancel</button></div>}
-    {segments.length > 0 ? <div className="segment-table" role="table" aria-label="Segments">
-      <div className="segment-row segment-head" role="row"><span role="columnheader">#</span><span role="columnheader">In</span><span role="columnheader">Out</span><span role="columnheader">Length</span><span role="columnheader"><span className="sr-only">Actions</span></span></div>
+    {job && <div className="editor-job" role="status"><Loader2 size={16} className="spin" aria-hidden="true"/><span>{t('Exporting')} · {Math.round(percent)}%</span><progress max={100} value={percent}/><button type="button" className="secondary-button" onClick={props.onCancelJob}>{t('Cancel')}</button></div>}
+    {segments.length > 0 ? <div className="segment-table" role="table" aria-label={t('Segments')}>
+      <div className="segment-row segment-head" role="row"><span role="columnheader">#</span><span role="columnheader">{t('In')}</span><span role="columnheader">{t('Out')}</span><span role="columnheader">{t('Length')}</span><span role="columnheader"><span className="sr-only">{t('Actions')}</span></span></div>
       {segments.map((segment, index) => <div key={segment.id} role="row" className={`segment-row${segment.id === selected ? ' selected' : ''}`} onClick={() => props.onSelect(segment.id)}>
         <span role="cell" className="segment-index">{index + 1}</span>
-        <span role="cell"><TimeField label={`Segment ${index + 1} in`} value={segment.start} fps={fps} max={duration} onCommit={t => props.onCommit(segments.map(s => s.id === segment.id ? {...s,start:Math.min(t, s.end - 1 / fps)} : s))}/></span>
-        <span role="cell"><TimeField label={`Segment ${index + 1} out`} value={segment.end} fps={fps} max={duration} onCommit={t => props.onCommit(segments.map(s => s.id === segment.id ? {...s,end:Math.max(t, s.start + 1 / fps)} : s))}/></span>
+        <span role="cell"><TimeField label={t('Segment {n} in', {n: index + 1})} value={segment.start} fps={fps} max={duration} onCommit={t => props.onCommit(segments.map(s => s.id === segment.id ? {...s,start:Math.min(t, s.end - 1 / fps)} : s))}/></span>
+        <span role="cell"><TimeField label={t('Segment {n} out', {n: index + 1})} value={segment.end} fps={fps} max={duration} onCommit={t => props.onCommit(segments.map(s => s.id === segment.id ? {...s,end:Math.max(t, s.start + 1 / fps)} : s))}/></span>
         <span role="cell" className="segment-length">{timecode(segment.end - segment.start, fps)}</span>
         <span role="cell" className="segment-actions">
-          <button type="button" className="icon-button" aria-label={`Play segment ${index + 1}`} title="Play segment" onClick={e => { e.stopPropagation(); props.onPlaySegment(segment); }}><Play size={15} aria-hidden="true"/></button>
-          <button type="button" className="icon-button" aria-label={`Delete segment ${index + 1}`} title="Delete segment" onClick={e => { e.stopPropagation(); props.onCommit(segments.filter(s => s.id !== segment.id)); }}><Trash2 size={15} aria-hidden="true"/></button>
+          <button type="button" className="icon-button" aria-label={t('Play segment {n}', {n: index + 1})} title={t('Play segment')} onClick={e => { e.stopPropagation(); props.onPlaySegment(segment); }}><Play size={15} aria-hidden="true"/></button>
+          <button type="button" className="icon-button" aria-label={t('Delete segment {n}', {n: index + 1})} title={t('Delete segment')} onClick={e => { e.stopPropagation(); props.onCommit(segments.filter(s => s.id !== segment.id)); }}><Trash2 size={15} aria-hidden="true"/></button>
         </span>
       </div>)}
-    </div> : <p className="editor-hint"><Scissors size={15} aria-hidden="true"/>Mark in and out points or split at the playhead. Segments you keep are exported in order; everything else is cut.</p>}
+    </div> : <p className="editor-hint"><Scissors size={15} aria-hidden="true"/>{t('Mark in and out points or split at the playhead. Segments you keep are exported in order; everything else is cut.')}</p>}
   </section>;
 }
 
@@ -216,27 +217,27 @@ export function ExportDialog({native,appHref,duration,segments,sourceHeight,onCl
   const [addToLibrary,setAddToLibrary] = useState(true);
   const output = segmentsDuration(segments, duration);
   const copy = mode === 'copy';
-  return <Modal title="Export" onClose={onClose}>
-    <p className="export-summary">{timeLabel(output)} from {segments.length || 1} {segments.length > 1 ? 'segments' : 'segment'}</p>
-    {!native && <div className="export-notice" role="note"><Download size={18} aria-hidden="true"/><p>Exporting needs the Videe desktop app.</p>{appHref && <a href={appHref}>Get the app</a>}</div>}
+  return <Modal title={t('Export')} onClose={onClose}>
+    <p className="export-summary">{t(segments.length > 1 ? '{time} from {n} segments' : '{time} from 1 segment', {time: timeLabel(output), n: segments.length})}</p>
+    {!native && <div className="export-notice" role="note"><Download size={18} aria-hidden="true"/><p>{t('Exporting needs the Videe desktop app.')}</p>{appHref && <a href={appHref}>{t('Get the app')}</a>}</div>}
     <fieldset className="export-fields" disabled={!native}>
     <div className="settings-group">
-      <label className="setting-row"><span>Method<small>{copy ? 'Fast, original quality. Cuts snap to the nearest keyframe.' : 'Frame-accurate cuts with your choice of format.'}</small></span><select aria-label="Export method" value={mode} onChange={e => setMode(e.target.value as 'encode'|'copy')}><option value="encode">Re-encode</option><option value="copy">Lossless copy</option></select></label>
+      <label className="setting-row"><span>{t('Method')}<small>{copy ? t('Fast, original quality. Cuts snap to the nearest keyframe.') : t('Frame-accurate cuts with your choice of format.')}</small></span><select aria-label={t('Export method')} value={mode} onChange={e => setMode(e.target.value as 'encode'|'copy')}><option value="encode">{t('Re-encode')}</option><option value="copy">{t('Lossless copy')}</option></select></label>
       {!copy && <>
-        <label className="setting-row"><span>Codec</span><select aria-label="Codec" value={codec} onChange={e => setCodec(e.target.value as 'h264'|'hevc')}><option value="h264">H.264 (most compatible)</option><option value="hevc">HEVC / H.265 (smaller)</option></select></label>
-        <label className="setting-row"><span>Quality</span><select aria-label="Quality" value={quality} onChange={e => setQuality(e.target.value as 'high'|'standard'|'small')}><option value="high">High</option><option value="standard">Standard</option><option value="small">Small file</option></select></label>
-        <label className="setting-row"><span>Resolution</span><select aria-label="Resolution" value={height} onChange={e => setHeight(Number(e.target.value))}>{RESOLUTIONS.filter(option => !option.value || !sourceHeight || option.value < sourceHeight).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-        <label className="setting-row"><span>Frame rate</span><select aria-label="Frame rate" value={fps} onChange={e => setFps(Number(e.target.value))}><option value={0}>Original</option><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
-        <label className="setting-row"><span>Rotate</span><select aria-label="Rotate" value={rotate} onChange={e => setRotate(Number(e.target.value))}><option value={0}>None</option><option value={90}>90° clockwise</option><option value={180}>180°</option><option value={270}>90° counterclockwise</option></select></label>
-        {codec === 'h264' && <label className="setting-row"><span>Hardware encoding<small>Faster on supported GPUs, slightly larger files.</small></span><input type="checkbox" role="switch" aria-label="Hardware encoding" checked={hardware} onChange={e => setHardware(e.target.checked)}/></label>}
+        <label className="setting-row"><span>{t('Codec')}</span><select aria-label={t('Codec')} value={codec} onChange={e => setCodec(e.target.value as 'h264'|'hevc')}><option value="h264">{t('H.264 (most compatible)')}</option><option value="hevc">{t('HEVC / H.265 (smaller)')}</option></select></label>
+        <label className="setting-row"><span>{t('Quality')}</span><select aria-label={t('Quality')} value={quality} onChange={e => setQuality(e.target.value as 'high'|'standard'|'small')}><option value="high">{t('High')}</option><option value="standard">{t('Standard')}</option><option value="small">{t('Small file')}</option></select></label>
+        <label className="setting-row"><span>{t('Resolution')}</span><select aria-label={t('Resolution')} value={height} onChange={e => setHeight(Number(e.target.value))}>{RESOLUTIONS.filter(option => !option.value || !sourceHeight || option.value < sourceHeight).map(option => <option key={option.value} value={option.value}>{t(option.label)}</option>)}</select></label>
+        <label className="setting-row"><span>{t('Frame rate')}</span><select aria-label={t('Frame rate')} value={fps} onChange={e => setFps(Number(e.target.value))}><option value={0}>{t('Original')}</option><option value={24}>24 fps</option><option value={25}>25 fps</option><option value={30}>30 fps</option><option value={60}>60 fps</option></select></label>
+        <label className="setting-row"><span>{t('Rotate')}</span><select aria-label={t('Rotate')} value={rotate} onChange={e => setRotate(Number(e.target.value))}><option value={0}>{t('None')}</option><option value={90}>{t('90° clockwise')}</option><option value={180}>180°</option><option value={270}>90° counterclockwise</option></select></label>
+        {codec === 'h264' && <label className="setting-row"><span>{t('Hardware encoding')}<small>{t('Faster on supported GPUs, slightly larger files.')}</small></span><input type="checkbox" role="switch" aria-label={t('Hardware encoding')} checked={hardware} onChange={e => setHardware(e.target.checked)}/></label>}
       </>}
-      <label className="setting-row"><span>Audio</span><input type="checkbox" role="switch" aria-label="Include audio" checked={audio} onChange={e => setAudio(e.target.checked)}/></label>
+      <label className="setting-row"><span>{t('Audio')}</span><input type="checkbox" role="switch" aria-label={t('Include audio')} checked={audio} onChange={e => setAudio(e.target.checked)}/></label>
     </div>
     <div className="settings-group export-destination">
-      <label className="setting-row"><span>Destination</span><select aria-label="Destination" value={destination} onChange={e => setDestination(e.target.value as 'file'|'apply')}><option value="file">Save as new file…</option><option value="apply">Replace in Videe (keeps original)</option></select></label>
-      {destination === 'file' && <label className="setting-row"><span>Add to library</span><input type="checkbox" role="switch" aria-label="Add to library" checked={addToLibrary} onChange={e => setAddToLibrary(e.target.checked)}/></label>}
+      <label className="setting-row"><span>{t('Destination')}</span><select aria-label={t('Destination')} value={destination} onChange={e => setDestination(e.target.value as 'file'|'apply')}><option value="file">{t('Save as new file…')}</option><option value="apply">{t('Replace in Videe (keeps original)')}</option></select></label>
+      {destination === 'file' && <label className="setting-row"><span>{t('Add to library')}</span><input type="checkbox" role="switch" aria-label={t('Add to library')} checked={addToLibrary} onChange={e => setAddToLibrary(e.target.checked)}/></label>}
     </div>
     </fieldset>
-    <div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button type="button" className="primary-button" disabled={!native || output < 0.25} onClick={() => onExport({mode,codec,quality,height,audio,rotate,fps,hardware,destination,addToLibrary})}>Export</button></div>
+    <div className="modal-actions"><button type="button" className="secondary-button" onClick={onClose}>{t('Cancel')}</button><button type="button" className="primary-button" disabled={!native || output < 0.25} onClick={() => onExport({mode,codec,quality,height,audio,rotate,fps,hardware,destination,addToLibrary})}>{t('Export')}</button></div>
   </Modal>;
 }

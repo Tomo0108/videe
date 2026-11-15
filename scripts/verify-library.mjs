@@ -6,7 +6,7 @@ const page = await browser.newPage({viewport:{width:1440,height:940}});
 const errors=[]; page.on('pageerror', e=>errors.push(e.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   assert.equal(await page.getByRole('switch',{name:'Animations',exact:true}).isChecked(),true);
   await page.getByRole('switch',{name:'Animations',exact:true}).uncheck();

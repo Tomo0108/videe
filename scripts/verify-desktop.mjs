@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import ffmpeg from 'ffmpeg-static';
 import { parseMediaInfo } from '../src/media.mjs';
 const userData = await mkdtemp('/tmp/videe-electron-test-');
-const app = await electron.launch({ args: ['.'], env: {...process.env,VIDEE_TEST_USER_DATA:userData} });
+const app = await electron.launch({ args: ['.'], env: {...process.env,VIDEE_TEST_USER_DATA:userData,VIDEE_LANG:'en'} });
 const page = await app.firstWindow(); const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try {
   await page.getByRole('button',{name:'Open folder',exact:true}).waitFor();

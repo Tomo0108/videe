@@ -12,7 +12,7 @@ const dialogReady=async()=>{
 };
 const fits=async selector=>{const r=await page.locator(selector).evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:innerWidth};});assert.ok(r.left>=0&&r.right<=r.width,`${selector} fits horizontally: ${JSON.stringify(r)}`);};
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.getByRole('button',{name:'Open folder',exact:true}).waitFor();
   await page.screenshot({path:'/tmp/videe-tahoe-empty.png',animations:'disabled'});
   const buffer=await readFile('tests/fixtures/sample.mp4');

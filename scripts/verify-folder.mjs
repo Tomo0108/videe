@@ -12,7 +12,7 @@ try {
   await copyFile(resolve('tests/fixtures/sample.mp4'), join(root, 'Inside.mp4'));
   await copyFile(resolve('tests/fixtures/sample.mp4'), join(root, 'nested', 'Deep.mp4'));
   await writeFile(join(root, 'note.txt'), 'skip');
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.waitForFunction(() => !document.querySelector('.header-open')?.disabled);
   assert.equal(await page.locator('input.folder-input').evaluate(el => el.hasAttribute('webkitdirectory')), true);
   const chooserPromise = page.waitForEvent('filechooser');

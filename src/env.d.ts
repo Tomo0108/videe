@@ -33,6 +33,8 @@ declare global {
       forgetVideo(id: string): Promise<void>;
       convertVideo(id: string): Promise<string>;
       cancelConversion(): Promise<void>;
+      setLanguage?(language: 'ja' | 'en'): Promise<void>;
+      onMenuAction?(cb: (action: 'settings' | 'guide') => void): () => void;
       listSubtitles(id: string): Promise<{ index: number; language: string; codec: string; label: string }[]>;
       extractSubtitle(id: string, index: number): Promise<string>;
       takeOpenedFiles?(): Promise<MediaItem[]>;

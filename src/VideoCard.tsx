@@ -4,6 +4,7 @@ import {sizeLabel,timeLabel} from './media.mjs';
 import {DRAG_TYPE} from './Sidebar';
 import type {MediaItem} from './store';
 import type {Collection} from './organization';
+import {locale,t,type Language} from './i18n.mjs';
 
 export type CardActions = {
   open:(item:MediaItem, resume?:boolean)=>void;
@@ -21,7 +22,7 @@ export type CardActions = {
 
 function playedLabel(item:MediaItem) {
   if (!item.lastPlayed) return '—';
-  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(item.lastPlayed);
+  return new Intl.DateTimeFormat(locale(), { month: 'short', day: 'numeric' }).format(item.lastPlayed);
 }
 const closeMenu = (element:HTMLElement) => element.closest('details')?.removeAttribute('open');
 /** Opens the menu above its button when there is no room below (bottom rows, under the mini player). */
@@ -39,7 +40,8 @@ const placeMenu = (menu:HTMLDetailsElement) => {
 export const extension = (name:string) => /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toUpperCase() || '';
 
 /** One library row or card. Memoized so playback progress never re-renders the whole library. */
-export const VideoCard = memo(function VideoCard({item,layout,selected,playing,folderName,folders,actions}:{item:MediaItem;layout:'grid'|'list';selected:boolean;playing:boolean;folderName:string;folders:Collection[];actions:MutableRefObject<CardActions>}) {
+// `language` is unused in the body but part of the memo key, so rows re-render when the language changes.
+export const VideoCard = memo(function VideoCard({item,layout,selected,playing,folderName,folders,actions}:{item:MediaItem;layout:'grid'|'list';selected:boolean;playing:boolean;folderName:string;folders:Collection[];language?:Language;actions:MutableRefObject<CardActions>}) {
   const inProgress = item.position > 0 && item.position < item.duration - 2;
   // Touch: a long press on a row starts selection, like Photos and Files.
   const pressTimer = useRef(0); const longPressed = useRef(false);
@@ -48,23 +50,23 @@ export const VideoCard = memo(function VideoCard({item,layout,selected,playing,f
     onPointerDown={event => { if (event.pointerType !== 'touch' || event.button !== 0) return; longPressed.current = false; cancelPress(); pressTimer.current = window.setTimeout(() => { pressTimer.current = 0; longPressed.current = true; actions.current.select(item.id, !selected, false); navigator.vibrate?.(10); }, 500); }}
     onPointerUp={cancelPress} onPointerCancel={cancelPress} onPointerLeave={cancelPress} onContextMenu={event => { if (longPressed.current) event.preventDefault(); }}
     onClickCapture={event => { if (longPressed.current) { longPressed.current = false; event.preventDefault(); event.stopPropagation(); } }} onDragStart={event => { const ids = actions.current.dragIds(item.id); event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(ids)); event.dataTransfer.setData('text/plain', item.name); event.dataTransfer.effectAllowed = 'move'; }}>
-    <label className="video-select"><input type="checkbox" aria-label={`Select ${item.name}`} checked={selected} onChange={event => actions.current.select(item.id, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey === true)} onClick={event => { if (event.shiftKey) { event.preventDefault(); actions.current.select(item.id, !selected, true); } }}/><Check size={14} strokeWidth={2.4} aria-hidden="true"/></label>
-    <button className="video-open" onClick={() => actions.current.open(item)} aria-label={`Play ${item.name}`}>
+    <label className="video-select"><input type="checkbox" aria-label={t('Select {name}', {name: item.name})} checked={selected} onChange={event => actions.current.select(item.id, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey === true)} onClick={event => { if (event.shiftKey) { event.preventDefault(); actions.current.select(item.id, !selected, true); } }}/><Check size={14} strokeWidth={2.4} aria-hidden="true"/></label>
+    <button className="video-open" onClick={() => actions.current.open(item)} aria-label={t('Play {name}', {name: item.name})}>
       <span className="video-preview"><span className={`video-thumbnail${item.thumbnail ? '' : ' pending'}`}>{item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" decoding="async" draggable={false}/> : <Film size={24} strokeWidth={1.3} aria-hidden="true"/>}<span className="thumbnail-play" aria-hidden="true"><Play size={23} fill="currentColor"/></span>{layout !== 'list' && item.duration > 0 && <span className="duration-label">{timeLabel(item.duration)}</span>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100, item.position / item.duration * 100)}%`}}/>}</span></span>
-      <span className="video-text"><span className="video-title" title={item.name}>{playing && <AudioLines size={14} className="now-playing" aria-label="Now playing"/>}{item.name.replace(/\.[^.]+$/, '')}</span></span>
+      <span className="video-text"><span className="video-title" title={item.name}>{playing && <AudioLines size={14} className="now-playing" aria-label={t('Now playing')}/>}{item.name.replace(/\.[^.]+$/, '')}</span></span>
       {layout === 'list' && <><span className="video-duration">{item.duration > 0 ? timeLabel(item.duration) : '—'}</span><span className="video-size">{sizeLabel(item.size)}</span><span className="video-played">{playedLabel(item)}</span></>}
     </button>
-    <button type="button" className={`video-favorite${item.favorite ? ' active' : ''}`} aria-pressed={item.favorite} aria-label={item.favorite ? `Unfavorite ${item.name}` : `Add ${item.name} to favorites`} title={item.favorite ? 'Unfavorite' : 'Add to favorites'} onClick={() => actions.current.favorite(item.id)}><Heart size={16} strokeWidth={1.8} fill={item.favorite ? 'currentColor' : 'none'} aria-hidden="true"/></button>
+    <button type="button" className={`video-favorite${item.favorite ? ' active' : ''}`} aria-pressed={item.favorite} aria-label={item.favorite ? t('Unfavorite {name}', {name: item.name}) : t('Add {name} to favorites', {name: item.name})} title={item.favorite ? t('Unfavorite') : t('Add to favorites')} onClick={() => actions.current.favorite(item.id)}><Heart size={16} strokeWidth={1.8} fill={item.favorite ? 'currentColor' : 'none'} aria-hidden="true"/></button>
     <details className="file-menu" onToggle={event => placeMenu(event.currentTarget)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }}>
-      <summary aria-label={`Options for ${item.name}`} title="More"><Ellipsis size={18} aria-hidden="true"/></summary>
+      <summary aria-label={t('Options for {name}', {name: item.name})} title={t('More')}><Ellipsis size={18} aria-hidden="true"/></summary>
       <div className="menu-panel">
-        {inProgress && <button aria-label={`Resume ${item.name}`} onClick={event => { closeMenu(event.currentTarget); actions.current.open(item, true); }}><Play size={16} aria-hidden="true"/>Resume</button>}
-        <button onClick={event => { actions.current.info(item.id); closeMenu(event.currentTarget); }}><Info size={16} aria-hidden="true"/>Video info</button>
-        {item.native && actions.current.reveal && <button onClick={event => { actions.current.reveal?.(item.id); closeMenu(event.currentTarget); }}><FolderOpen size={16} aria-hidden="true"/>Show in folder</button>}
-        <button aria-label="Reset watch history" disabled={!item.position && !item.lastPlayed} onClick={event => { actions.current.reset(item.id); closeMenu(event.currentTarget); }}><RotateCcw size={16} aria-hidden="true"/>Reset</button>
-        <button onClick={event => { actions.current.favorite(item.id); closeMenu(event.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? 'Unfavorite' : 'Add to favorites'}</button>
-        {folders.length > 0 && <div className="menu-move"><span className="menu-move-label">Move to</span>{folders.some(folder => folder.ids.includes(item.id)) && <button aria-label="Remove from folder" onClick={event => { actions.current.move([item.id], ''); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/>Remove from folder</button>}{folders.map(folder => <button key={folder.id} aria-label={`Move to ${folder.name}`} onClick={event => { actions.current.move([item.id], folder.id); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/><span className="menu-label" title={folder.name}>{folder.name}</span></button>)}</div>}
-        <button className="delete-action" onClick={event => { actions.current.remove(item.id); closeMenu(event.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>Remove from library</button>
+        {inProgress && <button aria-label={t('Resume {name}', {name: item.name})} onClick={event => { closeMenu(event.currentTarget); actions.current.open(item, true); }}><Play size={16} aria-hidden="true"/>{t('Resume')}</button>}
+        <button onClick={event => { actions.current.info(item.id); closeMenu(event.currentTarget); }}><Info size={16} aria-hidden="true"/>{t('Video info')}</button>
+        {item.native && actions.current.reveal && <button onClick={event => { actions.current.reveal?.(item.id); closeMenu(event.currentTarget); }}><FolderOpen size={16} aria-hidden="true"/>{t('Show in folder')}</button>}
+        <button aria-label={t('Reset watch history')} disabled={!item.position && !item.lastPlayed} onClick={event => { actions.current.reset(item.id); closeMenu(event.currentTarget); }}><RotateCcw size={16} aria-hidden="true"/>{t('Reset')}</button>
+        <button onClick={event => { actions.current.favorite(item.id); closeMenu(event.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? t('Unfavorite') : t('Add to favorites')}</button>
+        {folders.length > 0 && <div className="menu-move"><span className="menu-move-label">{t('Move to')}</span>{folders.some(folder => folder.ids.includes(item.id)) && <button aria-label={t('Remove from folder')} onClick={event => { actions.current.move([item.id], ''); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/>{t('Remove from folder')}</button>}{folders.map(folder => <button key={folder.id} aria-label={t('Move to {name}', {name: folder.name})} onClick={event => { actions.current.move([item.id], folder.id); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/><span className="menu-label" title={folder.name}>{folder.name}</span></button>)}</div>}
+        <button className="delete-action" onClick={event => { actions.current.remove(item.id); closeMenu(event.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>{t('Remove from library')}</button>
       </div>
     </details>
   </article>;
@@ -77,11 +79,11 @@ export function FolderCard({folder,items,layout,actions}:{folder:Collection;item
   const total = members.reduce((sum, item) => sum + (item.duration || 0), 0);
   const size = members.reduce((sum, item) => sum + (item.size || 0), 0);
   const watched = members.filter(item => item.lastPlayed > 0).length;
-  return <button type="button" className={`folder-card ${layout}`} aria-label={`Open folder ${folder.name}`} onClick={() => actions.current.openFolder(folder.id)}
+  return <button type="button" className={`folder-card ${layout}`} aria-label={t('Open folder {name}', {name: folder.name})} onClick={() => actions.current.openFolder(folder.id)}
     onDragOver={event => { if (!event.dataTransfer.types.includes(DRAG_TYPE)) return; event.preventDefault(); event.currentTarget.classList.add('drop-target'); }}
     onDragLeave={event => event.currentTarget.classList.remove('drop-target')}
     onDrop={event => { event.currentTarget.classList.remove('drop-target'); if (!event.dataTransfer.types.includes(DRAG_TYPE)) return; event.preventDefault(); event.stopPropagation(); try { const ids = JSON.parse(event.dataTransfer.getData(DRAG_TYPE) || '[]'); if (Array.isArray(ids) && ids.length) actions.current.dropOnFolder(folder.id, ids); } catch { /* Ignore foreign drops. */ } }}>
     <span className={`folder-cover count-${covers.length}`}>{covers.length ? covers.map(item => <img key={item.id} src={item.thumbnail} alt="" loading="lazy" decoding="async" draggable={false}/>) : <Folder size={layout === 'list' ? 20 : 34} strokeWidth={1.4} aria-hidden="true"/>}</span>
-    <span className="folder-text"><span className="folder-name">{folder.name}</span><span className="folder-meta">{members.length} {members.length === 1 ? 'video' : 'videos'}{total > 0 ? ` · ${timeLabel(total)}` : ''}{layout === 'list' && size > 0 ? ` · ${sizeLabel(size)}` : ''}{layout === 'list' && members.length > 0 ? ` · ${watched}/${members.length} watched` : ''}</span></span>
+    <span className="folder-text"><span className="folder-name">{folder.name}</span><span className="folder-meta">{t(members.length === 1 ? '1 video' : '{n} videos', {n: members.length})}{total > 0 ? ` · ${timeLabel(total)}` : ''}{layout === 'list' && size > 0 ? ` · ${sizeLabel(size)}` : ''}{layout === 'list' && members.length > 0 ? ` · ${t('{watched}/{total} watched', {watched, total: members.length})}` : ''}</span></span>
   </button>;
 }

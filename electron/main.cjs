@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, dialog, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell } = require('electron');
+const i18n = require('./i18n.cjs');
 const { basename, dirname, extname, isAbsolute, join } = require('node:path');
 const { existsSync, readFileSync } = require('node:fs');
 const { PassThrough, Readable } = require('node:stream');
@@ -231,6 +232,13 @@ async function importPaths(filePaths) {
   }
   await persist(); return records;
 }
+let languageFile = '';
+/** Mac menu bar in the app language. Windows keeps Electron's hidden default menu and its shortcuts. */
+function buildMenu() {
+  if (process.platform !== 'darwin') return;
+  const send = action => { if (win && !win.isDestroyed()) { showWindow(); win.webContents.send('menu-action', action); } };
+  Menu.setApplicationMenu(Menu.buildFromTemplate(i18n.macMenuTemplate(send)));
+}
 function createWindow() {
   win = new BrowserWindow({ ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : {}), width: 1440, height: 940, minWidth: 800, minHeight: 640, title: 'Videe', backgroundColor: '#fafafa', icon: join(__dirname, '../dist/icon.png'), webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   win.setMenuBarVisibility(false);
@@ -238,7 +246,9 @@ function createWindow() {
   win.webContents.on('will-navigate', event => event.preventDefault());
   win.webContents.on('did-start-loading', () => { rendererReady = false; });
   win.on('closed', () => { rendererReady = false; });
-  if (process.argv.includes('--dev')) win.loadURL('http://127.0.0.1:5173'); else win.loadFile(playerHtml());
+  // VIDEE_LANG=en|ja starts the player in that language (tests and screenshots use it).
+  const lang = i18n.normalizeLanguage(process.env.VIDEE_LANG);
+  if (process.argv.includes('--dev')) win.loadURL(`http://127.0.0.1:5173${lang ? `?lang=${lang}` : ''}`); else win.loadFile(playerHtml(), lang ? { query: { lang } } : undefined);
 }
 // Files opened from the OS ("Open with", default app, Dock/taskbar drop) wait here until the player is ready.
 let openQueue = [], rendererReady = false;
@@ -281,6 +291,11 @@ app.whenReady().then(async () => {
   registryFile = join(app.getPath('userData'), 'library.json'); cacheDir = join(app.getPath('userData'), 'converted');
   await fs.mkdir(cacheDir, { recursive: true });
   try { registry = JSON.parse(await fs.readFile(registryFile, 'utf8')); } catch { registry = {}; }
+  // The language the player last chose, so the Mac menu is right before the player loads.
+  languageFile = join(app.getPath('userData'), 'language.json');
+  try { i18n.setLanguage(JSON.parse(await fs.readFile(languageFile, 'utf8')).language); } catch { /* First launch: Japanese. */ }
+  i18n.setLanguage(process.env.VIDEE_LANG);
+  buildMenu();
   protocol.handle('videe', async request => {
     const url = new URL(request.url); const id = url.pathname.slice(1); const entry = registry[id];
     if (url.hostname === 'live' && entry) {
@@ -299,12 +314,12 @@ app.whenReady().then(async () => {
     };
   });
   register('pick-files', async () => {
-    const result = await dialog.showOpenDialog(win, { title: 'Open videos', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Videos', extensions: ['mp4', 'm4v', 'mov', 'qt', 'webm', 'mkv', 'avi', 'divx', 'wmv', 'asf', 'flv', 'f4v', 'mpeg', 'mpg', 'm2ts', 'mts', 'ts', '3gp', '3g2', 'ogv', 'vob', 'mxf', 'dv', 'hevc', 'av1', 'rm', 'rmvb'] }] });
+    const result = await dialog.showOpenDialog(win, { title: i18n.t('Open videos'), properties: ['openFile', 'multiSelections'], filters: [{ name: i18n.t('Videos'), extensions: ['mp4', 'm4v', 'mov', 'qt', 'webm', 'mkv', 'avi', 'divx', 'wmv', 'asf', 'flv', 'f4v', 'mpeg', 'mpg', 'm2ts', 'mts', 'ts', '3gp', '3g2', 'ogv', 'vob', 'mxf', 'dv', 'hevc', 'av1', 'rm', 'rmvb'] }] });
     if (result.canceled) return null;
     return importPaths(result.filePaths);
   });
   register('pick-folder', async () => {
-    const result = await dialog.showOpenDialog(win, { title: 'Open folder', properties: ['openDirectory'] });
+    const result = await dialog.showOpenDialog(win, { title: i18n.t('Open folder'), properties: ['openDirectory'] });
     if (result.canceled || !result.filePaths[0]) return null;
     const dir = result.filePaths[0];
     const records = await importPaths([dir]);
@@ -332,6 +347,11 @@ app.whenReady().then(async () => {
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
   register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
+  register('set-language', async value => {
+    if (!i18n.setLanguage(value)) return;
+    buildMenu();
+    await fs.writeFile(languageFile, JSON.stringify({ language: i18n.getLanguage() })).catch(() => {});
+  });
   register('cancel-conversion', () => { if (processJob) { processJob.cancelled = true; processJob.child?.kill('SIGTERM'); } });
   register('convert-video', async id => {
     if (!registry[id]) throw new Error('Video not found.');
@@ -398,7 +418,7 @@ app.whenReady().then(async () => {
     const { timecode } = await media();
     const stamp = timecode(time, 100).slice(0, 8).replace(/:/g, '-');
     const base = basename(entry.path, extname(entry.path));
-    const result = await dialog.showSaveDialog(win, { title: 'Save frame', defaultPath: join(app.getPath('pictures'), `${base} ${stamp}.png`), filters: [{ name: 'PNG image', extensions: ['png'] }] });
+    const result = await dialog.showSaveDialog(win, { title: i18n.t('Save frame'), defaultPath: join(app.getPath('pictures'), `${base} ${stamp}.png`), filters: [{ name: i18n.t('PNG image'), extensions: ['png'] }] });
     if (result.canceled || !result.filePath) return null;
     await fs.writeFile(result.filePath, data);
     return result.filePath;
@@ -425,7 +445,7 @@ app.whenReady().then(async () => {
     if (apply) output = join(cacheDir, `${id}.edited-${Date.now()}.${ext}`);
     else {
       const base = basename(entry.path, extname(entry.path));
-      const result = await dialog.showSaveDialog(win, { title: 'Export video', defaultPath: join(dirname(entry.path), `${base} (edited).${ext}`), filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
+      const result = await dialog.showSaveDialog(win, { title: i18n.t('Export video'), defaultPath: join(dirname(entry.path), `${base} (${i18n.t('edited')}).${ext}`), filters: [{ name: ext.toUpperCase(), extensions: [ext] }] });
       if (result.canceled || !result.filePath) return null;
       output = result.filePath;
     }

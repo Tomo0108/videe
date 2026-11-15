@@ -7,7 +7,7 @@ const cdp=await page.context().newCDPSession(page);await cdp.send('Media.enable'
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
- await page.goto('http://127.0.0.1:5173');
+ await page.goto('http://127.0.0.1:5173/?lang=en');
  assert.equal(await page.locator('.brand img').getAttribute('src'),'./icon.png');
  assert.equal(await page.getByRole('button',{name:'Lock library',exact:true}).count(),0);
  const buffer=await readFile('tests/fixtures/sample.mp4');

@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width:1440,height:940 } });
 const errors = []; page.on('pageerror', error=>errors.push(error.message));
 const dialogGone=()=>page.locator('dialog').waitFor({state:'detached'});
 try {
-  await page.goto('http://127.0.0.1:5173');
+  await page.goto('http://127.0.0.1:5173/?lang=en');
   await page.waitForFunction(()=>!document.querySelector('.header-open')?.disabled);
   assert.equal(await page.locator('.library-section').count(),1);
   assert.equal(await page.getByRole('heading',{name:'No videos',exact:true}).count(),1);

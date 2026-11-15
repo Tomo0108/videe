@@ -5,7 +5,14 @@
   <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>ja</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ja</string>
+		<string>en</string>
+	</array>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
 	<key>CFBundleDisplayName</key>
         <string>Videe</string>
 	<key>CFBundleExecutable</key>
@@ -69,9 +76,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Videe opens videos you choose from your library.</string>
+	<string>選んだ動画を Videe で開くために、写真ライブラリにアクセスします。</string>
 	<key>NSDocumentsFolderUsageDescription</key>
-	<string>Videe opens video files stored on this device.</string>
+	<string>このデバイスに保存された動画ファイルを Videe で開くために使います。</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>
