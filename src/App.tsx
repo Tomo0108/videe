@@ -83,7 +83,7 @@ export default function App() {
   const [gpuStatus,setGpuStatus] = useState<GpuStatus|null>(null); const [gpuLoading,setGpuLoading] = useState(false); const [cacheBytes,setCacheBytes] = useState<number|null>(null);
   const [ab, setAb] = useState<{a:number|null;b:number|null}>({a:null,b:null});
   const [chrome, setChrome] = useState(true);
-  const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(true);
+  const [subtitle,setSubtitle] = useState<{url:string;name:string}|null>(null); const [captions,setCaptions] = useState(false);
   const [embeddedTracks,setEmbeddedTracks] = useState<{index:number;label:string;language:string}[]>([]);
   const [isFullscreen,setIsFullscreen] = useState(false);
   const [videoZoom,setVideoZoom] = useState(1); const [videoPan,setVideoPan] = useState({x:0,y:0});
@@ -222,13 +222,13 @@ export default function App() {
     lastSave.current = performance.now();
     void savePosition(id, position).catch(() => notify('Could not save playback progress.'));
   }, [notify, now]);
-  const applyEmbedded = useCallback(async (itemId: string, index: number, label: string, sequence: number) => {
+  const applyEmbedded = useCallback(async (itemId: string, index: number, label: string, sequence: number, show = true) => {
     if (!window.videe?.extractSubtitle) return;
     try {
       const text = await window.videe.extractSubtitle(itemId, index);
       if (sequence !== openSequence.current) return;
       setSubtitle({ url: URL.createObjectURL(new Blob([text], { type: 'text/vtt' })), name: label });
-      setCaptions(true);
+      if (show) setCaptions(true);
     } catch { if (sequence === openSequence.current) notify('Could not read embedded subtitles.'); }
   }, [notify]);
   useEffect(() => { const handler = () => { if(document.visibilityState === 'hidden') saveProgress(); }; document.addEventListener('visibilitychange',handler); return () => document.removeEventListener('visibilitychange',handler); }, [saveProgress]);
@@ -254,9 +254,12 @@ export default function App() {
       try {
         const tracks = await window.videe!.listSubtitles!(item.id);
         if (sequence !== openSequence.current) return;
-        setEmbeddedTracks(tracks);
-        const pick = tracks.find(track => /^(ja|jpn)/i.test(track.language)) || tracks[0];
-        if (pick) await applyEmbedded(item.id, pick.index, pick.label, sequence);
+        // Japanese tracks come first and are loaded ready to show; subtitles stay hidden until turned on.
+        const japanese = (track: typeof tracks[number]) => /^(ja|jpn)\b/i.test(track.language) || /japanese|日本語/i.test(track.label);
+        const ordered = [...tracks.filter(japanese), ...tracks.filter(track => !japanese(track))];
+        setEmbeddedTracks(ordered);
+        const pick = ordered[0];
+        if (pick) await applyEmbedded(item.id, pick.index, pick.label, sequence, false);
       } catch { if (sequence === openSequence.current) setEmbeddedTracks([]); }
     })();
   }, [applyEmbedded]);

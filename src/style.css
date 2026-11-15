@@ -1407,3 +1407,19 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .choice-options { width: max-content; min-width: 220px; max-width: min(360px, calc(100vw - 40px)); }
 .choice-options button span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
 .choice-options button svg { flex: none; }
+
+/* Long folder names in the video menu stay on one line. */
+.menu-panel { max-width: min(320px, calc(100vw - 32px)); }
+.menu-move button { min-width: 0; }
+.menu-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Name fields keep a usable width; the button wraps below on narrow screens. */
+.tool-actions label { flex: 1 1 220px; }
+/* Library totals never break into one character per line. */
+.library-title { min-width: 0; }
+.library-title .library-count { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) {
+  /* Inside a folder the collection tools need the full width, so they move under the title. */
+  .library-header:has(.organization-bar .choice-menu) .organization-bar { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .library-header:has(.organization-bar .choice-menu) .library-title { grid-column: 1 / -1; }
+  .library-header .collection-name { max-width: 160px; }
+}
