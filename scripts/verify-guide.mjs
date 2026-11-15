@@ -1,0 +1,93 @@
+// Checks the first-launch tour and the quick guide. Needs `npm run dev`.
+// Pass a folder to also save screenshots: node scripts/verify-guide.mjs /tmp/shots
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+
+const URL = process.env.VIDEE_URL || 'http://127.0.0.1:5173';
+const shotsDir = process.argv[2];
+if (shotsDir) mkdirSync(shotsDir, { recursive: true });
+const browser = await chromium.launch();
+const errors = [];
+const shot = async (page, name) => { if (shotsDir) await page.screenshot({ path: `${shotsDir}/${name}.png` }); };
+
+for (const [label, viewport, scheme] of [['desktop', { width: 1440, height: 900 }, 'light'], ['phone', { width: 390, height: 844 }, 'light'], ['desktop-dark', { width: 1440, height: 900 }, 'dark']]) {
+  const page = await browser.newPage({ viewport, colorScheme: scheme, reducedMotion: 'reduce' });
+  page.on('pageerror', error => errors.push(`${label}: ${error.message}`));
+
+  // Automated browsers never get the tour on their own, so other scripts stay unblocked.
+  await page.goto(URL);
+  await page.waitForSelector('.no-results h2');
+  assert.equal(await page.locator('dialog.tour').count(), 0, 'tour must not auto-start under automation');
+
+  // ?tour starts it like a first launch.
+  await page.goto(`${URL}/?tour`);
+  const tour = page.locator('dialog.tour');
+  await tour.waitFor();
+  assert.equal(await tour.locator('h2').textContent(), 'Videe へようこそ');
+  await shot(page, `tour-1-${label}`);
+  await tour.getByRole('button', { name: 'はじめる' }).click();
+  for (let step = 2; step <= 5; step++) {
+    await page.waitForTimeout(150);
+    const spot = await tour.locator('.tour-spot').boundingBox();
+    assert.ok(spot && spot.width > 10, `step ${step} highlights its control`);
+    const card = await tour.locator('.tour-card').boundingBox();
+    assert.ok(card.x >= 0 && card.y >= 0 && card.x + card.width <= viewport.width + 1 && card.y + card.height <= viewport.height + 1, `step ${step} card fits the window`);
+    if (step === 4) {
+      // Settings changed in the tour apply right away.
+      const resume = tour.getByRole('switch', { name: '続きから再生' });
+      assert.equal(await resume.isChecked(), true);
+      await resume.click();
+      assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('videe-preferences'))).resume, false);
+      await resume.click();
+    }
+    await shot(page, `tour-${step}-${label}`);
+    if (step < 5) await tour.getByRole('button', { name: '次へ' }).click();
+  }
+  // The last step hands off to the guide and remembers the tour was seen.
+  await tour.getByRole('button', { name: 'クイックガイドを開く' }).click();
+  await page.locator('dialog.guide-modal').waitFor();
+  assert.equal(await page.evaluate(() => localStorage.getItem('videe-tour')), '1');
+  assert.equal(await page.locator('dialog.tour').count(), 0);
+  const images = page.locator('.guide-figure img');
+  assert.equal(await images.count(), 5);
+  for (const img of await images.all()) { await img.scrollIntoViewIfNeeded(); await page.waitForFunction(el => el.complete && el.naturalWidth > 0, await img.elementHandle()); }
+  assert.ok(await page.locator('.guide-mark').count() >= 20, 'callouts drawn over screenshots');
+  assert.ok(await page.locator('.guide .guide-ui svg').count() >= 20, 'app icons shown inline in the text');
+  await page.locator('dialog.guide-modal').evaluate(el => { el.scrollTop = 0; });
+  await shot(page, `guide-top-${label}`);
+  await page.getByRole('button', { name: '設定を確認する' }).click();
+  await page.waitForTimeout(400);
+  await shot(page, `guide-settings-${label}`);
+  await page.getByRole('button', { name: '再生する' }).first().click();
+  await page.waitForTimeout(400);
+  await shot(page, `guide-play-${label}`);
+  await page.locator('dialog.guide-modal .modal-head [aria-label="Close"]').click();
+  await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
+
+  // Seen: no tour on the next normal launch even outside automation logic.
+  await page.goto(URL);
+  await page.waitForSelector('.no-results h2');
+  assert.equal(await page.locator('dialog.tour').count(), 0);
+
+  // F1 opens the guide; Esc closes it.
+  await page.keyboard.press('F1');
+  await page.locator('dialog.guide-modal').waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
+
+  // Header help button and Settings rows reopen both.
+  await page.getByRole('button', { name: 'Quick guide' }).first().click();
+  await page.locator('dialog.guide-modal').waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('dialog.guide-modal').waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: /Take the tour/ }).click();
+  await tour.waitFor();
+  await page.keyboard.press('Escape');
+  await tour.waitFor({ state: 'detached' });
+  await page.close();
+}
+await browser.close();
+assert.deepEqual(errors, []);
+console.log('Quick guide and tour OK');

@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useRef,type ReactNode} from 'react';
 import {X} from 'lucide-react';
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, className = '' }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   const closed = useRef(false);
   const dismiss = useCallback(() => {
@@ -30,5 +30,5 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     dialog.addEventListener('scroll', sync, { passive: true }); sync();
     return () => { observer.disconnect(); mutations.disconnect(); dialog.removeEventListener('scroll', sync); };
   }, []);
-  return <dialog ref={ref} onCancel={e => { e.preventDefault(); dismiss(); }} onClick={e => { if(e.target === e.currentTarget) {const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dismiss();} }} aria-label={title} className="modal"><div className="modal-head"><h2>{title}</h2><button className="icon-button" aria-label="Close" title="Close" onClick={dismiss}><X size={18} strokeWidth={1.8} aria-hidden="true"/></button></div>{children}</dialog>;
+  return <dialog ref={ref} onCancel={e => { e.preventDefault(); dismiss(); }} onClick={e => { if(e.target === e.currentTarget) {const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dismiss();} }} aria-label={title} className={`modal ${className}`.trim()}><div className="modal-head"><h2>{title}</h2><button className="icon-button" aria-label="Close" title="Close" onClick={dismiss}><X size={18} strokeWidth={1.8} aria-hidden="true"/></button></div>{children}</dialog>;
 }

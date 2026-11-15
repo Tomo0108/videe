@@ -1,7 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart, CircleHelp, BookOpen, Sparkles } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -21,6 +21,9 @@ import { EditorPanel, ExportDialog, newSegmentId, type Segment } from './Editor'
 import { Sidebar, type View } from './Sidebar';
 import { VideoCard, FolderCard, type CardActions } from './VideoCard';
 import type { Analysis, ExportOptions } from './env';
+import { QuickGuide } from './QuickGuide';
+import { ProductTour } from './ProductTour';
+import { markTourSeen, shouldAutoStartTour } from './onboarding.mjs';
 
 const KEY_LABELS: Record<string, string> = { space: '␣', left: '←', right: '→', up: '↑', down: '↓', esc: 'esc' };
 function ShortcutKeys({ keys }: { keys: string[] }) {
@@ -76,7 +79,7 @@ export default function App() {
   const [activeId, setActiveId] = useState<string | null>(null); const [source, setSource] = useState(''); const [playing,setPlaying] = useState(false); const [position,setPosition] = useState(0); const [duration,setDuration] = useState(0);
   const [muted,setMuted] = useState(false); const [error,setError] = useState(''); const [loading,setLoading] = useState(false); const [busy,setBusy] = useState(false); const [conversion,setConversion] = useState<number | null>(null); const [conversionTotal,setConversionTotal] = useState(0);
   const [prefs,setPrefs] = useState<Preferences>(getPreferences); const prefsRef = useRef(prefs); prefsRef.current = prefs;
-  const [modal,setModal] = useState<'settings'|'subtitles'|'export'|'playback'|null>(null); const [deleteIds,setDeleteIds] = useState<string[]|null>(null); const [toast,setToast] = useState<{text:string;action?:{label:string;run:()=>void}}|null>(null); const [dragging,setDragging] = useState(false);
+  const [modal,setModal] = useState<'settings'|'subtitles'|'export'|'playback'|'guide'|null>(null); const [tourOpen,setTourOpen] = useState(false); const tourChecked = useRef(false); const [deleteIds,setDeleteIds] = useState<string[]|null>(null); const [toast,setToast] = useState<{text:string;action?:{label:string;run:()=>void}}|null>(null); const [dragging,setDragging] = useState(false);
   const [gpuStatus,setGpuStatus] = useState<GpuStatus|null>(null); const [gpuLoading,setGpuLoading] = useState(false); const [cacheBytes,setCacheBytes] = useState<number|null>(null);
   const [ab, setAb] = useState<{a:number|null;b:number|null}>({a:null,b:null});
   const [chrome, setChrome] = useState(true);
@@ -127,6 +130,20 @@ export default function App() {
     if (window.videe?.getGpuStatus) void refreshGpuStatus();
     if (modal === 'settings' && window.videe?.cacheInfo) void window.videe.cacheInfo().then(info => setCacheBytes(info.bytes)).catch(() => setCacheBytes(null));
   }, [modal, refreshGpuStatus]);
+  // First launch: offer the product tour once the library is on screen (not over a video opened from Explorer).
+  useEffect(() => {
+    if (tourChecked.current || !ready || activeId || modal) return;
+    tourChecked.current = true;
+    let storage: Storage | null = null; try { storage = localStorage; } catch { /* Private mode. */ }
+    if (shouldAutoStartTour({ storage, webdriver: navigator.webdriver, search: location.search })) setTourOpen(true);
+  }, [ready, activeId, modal]);
+  const closeTour = useCallback(() => { try { markTourSeen(localStorage); } catch { /* Shows again next launch. */ } setTourOpen(false); }, []);
+  const startTour = useCallback(() => { setModal(null); setTourOpen(true); }, []);
+  useEffect(() => {
+    const help = (e: KeyboardEvent) => { if (e.key !== 'F1' || e.repeat) return; e.preventDefault(); setTourOpen(false); setModal(current => current === 'guide' ? current : 'guide'); };
+    window.addEventListener('keydown', help);
+    return () => window.removeEventListener('keydown', help);
+  }, []);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), toast.action ? 9000 : 5500); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => { try { localStorage.setItem('videe-preferences', JSON.stringify(prefs)); } catch { notify('Could not save preferences. Check available storage.'); } if(videoRef.current) { videoRef.current.playbackRate = prefs.speed; videoRef.current.volume = prefs.volume; } }, [prefs, notify]);
   useEffect(() => window.videe?.onConversionProgress(({id,seconds,total}) => { if(id === activeRef.current) { setConversion(seconds); if (total) setConversionTotal(total); } }), []);
@@ -987,6 +1004,7 @@ export default function App() {
       <div className="header-actions">
         {!watching && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
         {watching && <IconButton icon={Scissors} label={editing ? 'Close editor' : 'Edit video'} active={editing} disabled={!duration || !!error} onClick={toggleEditor}/>}
+        {!watching && <IconButton icon={CircleHelp} label="Quick guide" className="header-help" onClick={() => setModal('guide')}/>}
         <IconButton icon={Settings2} label="Settings" onClick={() => setModal('settings')}/>
       </div>
     </header>
@@ -1102,10 +1120,14 @@ export default function App() {
       <SecuritySettings/>
       <section className="settings-section" aria-label="About"><h3>About</h3><div className="settings-group">
         <div className="setting-row app-about"><img src="./icon.png" width="40" height="40" alt=""/><div><strong translate="no">Videe</strong><span>Version {appPackage.version}</span></div></div>
+        <button type="button" className="setting-row setting-link" onClick={() => setModal('guide')}><span><span className="setting-link-label"><BookOpen size={16} aria-hidden="true"/>Quick guide</span><small>Illustrated steps for Windows · F1</small></span><ChevronRight size={16} aria-hidden="true"/></button>
+        <button type="button" className="setting-row setting-link" onClick={startTour}><span><span className="setting-link-label"><Sparkles size={16} aria-hidden="true"/>Take the tour</span><small>Key settings and where things are</small></span><ChevronRight size={16} aria-hidden="true"/></button>
         {!nativeShell && <a className="setting-row setting-link" href={siteHref}><span>Get the app</span><ChevronRight size={16} aria-hidden="true"/></a>}
         <details className="setting-disclosure help-details"><summary><span>Shortcuts</span><ChevronRight size={16} aria-hidden="true"/></summary><div className="shortcuts">{([['Play / pause',['space','K']],['Seek',['left','right']],['Volume',['up','down']],['Jump',['0–9']],['Start / end',['Home','End']],['Speed',['[',']']],['Frame',[',','.']],['Full screen',['F']],['Mute',['M']],['Subtitles',['C']],['Save frame',['⇧','S']],['Editor',['E']],['Mark in / out',['I','O']],['Split',['S']],['Undo',['⌘/Ctrl','Z']],['Exit full screen',['esc']]] as const).map(([label,keys]) => <div key={label}><span>{label}</span><span className="shortcut-keys"><ShortcutKeys keys={[...keys]}/></span></div>)}</div></details>
       </div></section>
     </Modal>}
+    {modal === 'guide' && <QuickGuide version={appPackage.version} onClose={() => setModal(null)} onStartTour={startTour}/>}
+    {tourOpen && <ProductTour prefs={prefs} setPrefs={setPrefs} desktop={!!window.videe} onOpenGuide={() => { closeTour(); setModal('guide'); }} onClose={closeTour}/>}
     {modal === 'export' && active && <ExportDialog native={!!active.native && !!window.videe?.exportVideo} appHref={nativeShell ? undefined : siteHref} duration={duration} segments={segments} sourceHeight={analysis?.info.video?.height || 0} onClose={() => setModal(null)} onExport={options => void runExport(options)}/>}
     {modal === 'playback' && active && <Modal title="Playback details" onClose={() => setModal(null)}>
       <p className="delete-filename">{active.name}</p>

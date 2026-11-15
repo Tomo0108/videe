@@ -26,6 +26,7 @@
     "ios:build": "npm run ios:sync && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath /tmp/videe-ios-build CODE_SIGNING_ALLOWED=NO build",
     "test:library": "node scripts/verify-library.mjs",
     "icons:build": "node scripts/build-icons.mjs",
+    "guide:build": "node scripts/build-guide.mjs",
     "test:playback": "node scripts/verify-playback.mjs",
     "test:mini-player": "node scripts/verify-mini-player.mjs",
     "test:ui": "node scripts/verify-tahoe.mjs",
@@ -34,7 +35,8 @@
     "test:storage": "node scripts/verify-storage.mjs",
     "test:organization": "node scripts/verify-organization.mjs",
     "test:collections": "node scripts/verify-collections.mjs",
-    "test:folder": "node scripts/verify-folder.mjs"
+    "test:folder": "node scripts/verify-folder.mjs",
+    "test:guide": "node scripts/verify-guide.mjs"
   },
   "build": {
     "appId": "app.videe.player",
