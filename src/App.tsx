@@ -32,6 +32,9 @@ function ShortcutKeys({ keys }: { keys: string[] }) {
 
 type GpuStatus = { videoDecode: string; gpuCompositing: string; rasterization: string; encoder?: string };
 type Engine = 'direct' | 'live';
+/** Controls fade after this much stillness while playing, and almost at once when the pointer leaves the player. */
+const CHROME_IDLE_MS = 1600;
+const CHROME_LEAVE_MS = 150;
 type JobKind = 'convert' | 'prepare' | 'export';
 // Files above this size start in live playback instead of waiting for a remux.
 const REMUX_LIMIT = 2 * 1024 ** 3;
@@ -547,8 +550,16 @@ export default function App() {
     setChrome(true);
     window.clearTimeout(chromeHide.current);
     if (hold || !playing || error || controlsLocked || modal || editing) return;
-    chromeHide.current = window.setTimeout(() => setChrome(false), 2800);
+    chromeHide.current = window.setTimeout(() => setChrome(false), CHROME_IDLE_MS);
   }, [playing, error, controlsLocked, modal, editing]);
+  /** The pointer left the player (or the window): fade the controls out right away while playing. */
+  const leaveChrome = useCallback(() => {
+    window.clearTimeout(chromeHide.current);
+    if (!playing || error || controlsLocked || modal || editing || moreOpen) return;
+    // A native <select> popup (speed) sits outside the page; keep the controls up while it is open.
+    if (document.activeElement instanceof HTMLSelectElement && stageRef.current?.contains(document.activeElement)) return;
+    chromeHide.current = window.setTimeout(() => setChrome(false), CHROME_LEAVE_MS);
+  }, [playing, error, controlsLocked, modal, editing, moreOpen]);
   const handleVideoClick = (event: React.MouseEvent<HTMLVideoElement>) => {
     if (panWasDragged.current) { panWasDragged.current = false; return; }
     if (event.detail > 1) return;
@@ -1033,7 +1044,7 @@ export default function App() {
     {!watching && <Sidebar view={view} scope={scope} counts={counts} collections={collections} collapsed={prefs.sidebar === 'collapsed'} onView={selectView} onScope={openScope} onCreate={kind => { setCreating(kind); setNewName(''); }} onDropIds={dropOnFolder} onToggle={() => setPrefs({...prefs, sidebar: prefs.sidebar === 'collapsed' ? 'expanded' : 'collapsed'})}/>}
     <main id="main" tabIndex={-1} className={editing && watching ? 'editing' : undefined}>
       {active && <section className={`player-view${minimized ? ' mini-player' : ''}`} aria-label={minimized ? 'Mini player' : 'Video player'}>
-        <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || editing || moreOpen ? 'on' : 'off'} onPointerMove={() => revealChrome()}>
+        <div className="player-stage" ref={stageRef} data-chrome={chrome || controlsLocked || editing || moreOpen ? 'on' : 'off'} onPointerMove={() => revealChrome()} onPointerLeave={event => { if (event.pointerType === 'mouse') leaveChrome(); }}>
           <div className="video-surface" inert={controlsLocked}>
             {source && <video key={source} ref={videoRef} src={source} playsInline preload={engine === 'live' ? 'auto' : 'metadata'} muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null) && engine === 'direct'} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} onError={handleVideoError}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default onLoad={shiftCues}/>}</video>}
             {loading && !error && !blockingJob && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">Loading…</span></div>}

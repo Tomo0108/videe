@@ -1452,3 +1452,7 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
   .library-header:has(.organization-bar .choice-menu) .library-title { grid-column: 1 / -1; }
   .library-header .collection-name { max-width: 160px; }
 }
+/* Player controls fade and settle slightly when they hide, and come back the same way. */
+.player-stage .player-controls { transition: opacity .32s var(--ease-out), translate .32s var(--ease-out); }
+.player-stage[data-chrome=off] .player-controls { translate: 0 8px; }
+:root[data-motion=off] .player-stage .player-controls { transition: none; translate: none; }
