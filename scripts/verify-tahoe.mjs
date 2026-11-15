@@ -23,8 +23,7 @@ try {
   for(const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:940});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-    await page.locator('.file-menu summary').first().click();await fits('.file-menu[open] .menu-panel');
-    await page.getByRole('button',{name:'Video info',exact:true}).click();await dialogReady();await fits('dialog');
+    await page.locator('.video-info-button').first().click();await dialogReady();await fits('dialog');
     await page.keyboard.press('Escape');await dialogGone();
   }
   await page.getByRole('button',{name:'Settings',exact:true}).click();

@@ -23,7 +23,8 @@ try {
   assert.equal(await page.locator('.video-card').count(), 1);
   assert.equal(await page.locator('.video-title').innerText(), 'Inside');
   await page.waitForFunction(() => document.querySelectorAll('.video-thumbnail img').length >= 1, null, { timeout: 20000 });
-  assert.equal(await page.locator('.video-list').count(), 1);
+  // Grid is the default layout.
+  assert.equal(await page.locator('.video-grid:not(.video-list)').count(), 1);
   assert.equal(await page.locator('.collection-name').innerText(), basename(root));
   await page.locator('.organization summary[aria-label="Collection"]').click();
   await page.locator('.organization .choice-options').getByRole('button', { name: 'nested', exact: true }).click();
@@ -38,6 +39,7 @@ try {
   await page.getByRole('button', { name: 'Open video', exact: true }).click();
   await (await videoChooserPromise).setFiles(resolve('tests/fixtures/sample.mp4'));
   await page.waitForFunction(() => document.querySelectorAll('.video-card').length === 2);
+  await page.getByRole('button', { name: 'List view', exact: true }).click();
   await page.getByRole('button', { name: 'Duration', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: 'Duration', exact: true }).getAttribute('aria-sort'), 'descending');
   await page.reload();

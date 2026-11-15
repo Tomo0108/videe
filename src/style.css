@@ -132,7 +132,7 @@ dialog, dialog * { -webkit-app-region: no-drag; }
 .layout-switch:has(.active:hover) .layout-pill { background: var(--cta-hover); }
 .video-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 32px 24px; }
 .video-card { position: relative; min-width: 0; border-radius: 18px; display: grid; grid-template-columns: 32px minmax(0,1fr); column-gap: 8px; align-items: start; }
-.video-card:has(.file-menu[open]) { z-index: 8; }
+.video-card:has(.video-info-button[open]) { z-index: 8; }
 .video-open { width: 100%; display: block; padding: 0; text-align: left; border-radius: 18px; grid-column: 2; }
 .video-thumbnail { display: flex; align-items: center; justify-content: center; aspect-ratio: 16/9; width: 100%; background: var(--sidebar); color: var(--muted); border-radius: 12px; overflow: hidden; position: relative; box-shadow: inset 0 0 0 1px var(--line), 0 4px 14px #132e4e0c; }
 .video-thumbnail > img { width: 100%; height: 100%; transition: scale var(--duration-fast) var(--ease-out); }
@@ -146,13 +146,13 @@ dialog, dialog * { -webkit-app-region: no-drag; }
 .video-title { display: block; padding: 13px 32px 0 1px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--type-body); font-weight: 600; }
 .video-meta { display: flex; align-items: center; gap: 7px; color: var(--muted); margin: 4px 0 0 1px; font-size: var(--type-caption); }
 .video-meta svg { color: var(--accent); }
-.file-menu { position: absolute; right: -4px; bottom: 12px; }
-.file-menu summary { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; color: var(--muted); cursor: pointer; list-style: none; }
-.file-menu summary::-webkit-details-marker { display: none; }
-.file-menu summary:hover, .file-menu[open] summary { background: var(--hover); color: var(--ink); }
-.file-menu[open] { z-index: 6; }
+.video-info-button { position: absolute; right: -4px; bottom: 12px; }
+.video-info-button { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; color: var(--muted); cursor: pointer; list-style: none; }
+.video-info-button::-webkit-details-marker { display: none; }
+.video-info-button:hover { background: var(--hover); color: var(--ink); }
+.video-info-button[open] { z-index: 6; }
 .menu-panel { position: absolute; top: 38px; right: 0; min-width: 210px; padding: 5px; border-radius: 16px; background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: var(--shadow), 0 14px 40px #152b4b20; backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); }
-.file-menu[open] .menu-panel { animation: videe-menu-in var(--duration-fast) var(--ease-out) both; }
+.video-info-button[open] .menu-panel { animation: videe-menu-in var(--duration-fast) var(--ease-out) both; }
 .menu-panel button { display: flex; align-items: center; gap: 10px; padding: 10px; width: 100%; text-align: left; white-space: nowrap; border-radius: 10px; font-size: var(--type-body); }
 .menu-panel button:hover:not(:disabled) { background: var(--hover); }
 .menu-panel .delete-action { color: var(--danger); border-top: 1px solid var(--line); margin-top: 4px; }
@@ -166,7 +166,7 @@ dialog, dialog * { -webkit-app-region: no-drag; }
 .video-list .video-thumbnail { width: 100%; border-radius: 12px; }
 .video-list .video-title { align-self: end; padding-top: 0; }
 .video-list .video-meta { align-self: start; }
-.video-list .file-menu { right: 0; top: 29px; bottom: auto; }
+.video-list .video-info-button { right: 0; top: 29px; bottom: auto; }
 .no-results { padding: 130px 0; text-align: center; color: var(--muted); }
 .header-open:disabled { opacity: .45; }
 .primary-button, .secondary-button, .danger-button { border-radius: 999px; font-weight: 500; }
@@ -709,9 +709,9 @@ body { font-weight:400; }
 .search-box input::-webkit-search-cancel-button { display: none; }
 .search-box button { min-width: 28px; min-height: 28px; align-items: center; justify-content: center; }
 .video-meta { min-height: 18px; }
-.video-card .file-menu,
+.video-card .video-info-button,
 .video-card .video-favorite { grid-column: 2; grid-row: 1; }
-.video-card .file-menu { bottom: 16px; }
+.video-card .video-info-button { bottom: -6px; }
 .video-list .video-title { grid-row: auto; align-self: end; }
 .video-list .video-meta { align-self: start; }
 .no-results { padding: 64px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -807,14 +807,14 @@ body { font-weight:400; }
   grid-column: 7;
   grid-row: auto;
 }
-.video-list .video-card .file-menu {
+.video-list .video-card .video-info-button {
   position: relative;
   inset: auto;
   grid-column: 8;
   grid-row: auto;
   justify-self: stretch;
 }
-.video-list .file-menu .menu-panel { top: 38px; }
+.video-list .video-info-button .menu-panel { top: 38px; }
 .video-list {
   gap: 0;
   --list-rule: color-mix(in srgb, var(--ink) 14%, transparent);
@@ -846,7 +846,7 @@ body { font-weight:400; }
 .video-list .video-duration,
 .video-list .video-size,
 .video-list .video-played,
-.video-list .video-card .file-menu {
+.video-list .video-card .video-info-button {
   align-self: stretch;
   width: 100%;
   box-shadow: inset 1px 0 0 var(--list-rule);
@@ -856,7 +856,7 @@ body { font-weight:400; }
 .list-actions {
   grid-column: 8;
 }
-.video-list .video-card .file-menu {
+.video-list .video-card .video-info-button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -897,7 +897,7 @@ body { font-weight:400; }
   .video-list .video-preview { width: 48px; }
   .video-list .video-card .video-favorite { display: none; }
   .list-actions,
-  .video-list .video-card .file-menu { grid-column: 6; }
+  .video-list .video-card .video-info-button { grid-column: 6; }
 }
 
 /* A persistent media surface: resizing never replaces the video element. */
@@ -1139,7 +1139,7 @@ body { font-weight:400; }
   .video-list .video-preview { width: 44px; }
   .list-sort-size, .video-list .video-size { display: none; }
   .list-sort-duration { grid-column: 4; }
-  .list-actions, .video-list .video-card .file-menu { grid-column: 5; }
+  .list-actions, .video-list .video-card .video-info-button { grid-column: 5; }
   .video-subline .video-format { display: none; }
 }
 @media (max-width: 480px) {
@@ -1205,8 +1205,8 @@ body { font-weight:400; }
   .video-list.selecting .video-preview { grid-column: 2; }
   .video-list.selecting .video-text { grid-column: 3; }
   .video-list .video-duration, .video-list .video-size, .video-list .video-played, .video-list .video-card .video-favorite { display: none; }
-  .video-list .video-card .file-menu { grid-column: 3; box-shadow: none; padding: 0; }
-  .video-list.selecting .video-card .file-menu { grid-column: 4; }
+  .video-list .video-card .video-info-button { grid-column: 3; box-shadow: none; padding: 0; }
+  .video-list.selecting .video-card .video-info-button { grid-column: 4; }
   .video-list .video-text .video-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
   .video-list .video-subline { gap: 6px; flex-wrap: nowrap; overflow: hidden; }
   .video-list .video-subline .subline-duration, .video-list .video-subline .subline-size { display: inline; white-space: nowrap; }
@@ -1297,9 +1297,9 @@ body { font-weight:400; }
   .player-controls .icon-button { min-width: 40px; min-height: 44px; }
   .video-select { width: 44px; height: 44px; }
   .video-select input { width: 28px; height: 28px; }
-  .file-menu summary, .collection-new summary, .choice-menu summary { min-width: 44px; min-height: 44px; }
+  .video-info-button, .collection-new summary, .choice-menu summary { min-width: 44px; min-height: 44px; }
   .video-card { grid-template-columns: 44px minmax(0, 1fr); }
-  .video-list .video-card .file-menu { min-width: 44px; }
+  .video-list .video-card .video-info-button { min-width: 44px; }
   .layout-switch .icon-button { width: 44px; height: 44px; }
   .layout-pill { width: 44px; }
   .layout-switch[data-layout=list] .layout-pill { translate: 44px 0; }
@@ -1423,7 +1423,7 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .tour h2 + p { margin-top: 2px; }
 .tour-settings .setting-row { padding: 8px 0; }
 /* Menus near the bottom of the window (or above the mini player) open upward. */
-.file-menu[data-up] .menu-panel, .video-list .file-menu[data-up] .menu-panel { top: auto; bottom: 38px; transform-origin: bottom right; }
+.video-info-button[data-up] .menu-panel, .video-list .video-info-button[data-up] .menu-panel { top: auto; bottom: 38px; transform-origin: bottom right; }
 
 /* Video info: the name reads as a heading; each row is one line, label left and value right. */
 .info-name { margin: 6px 0 4px; font-size: var(--type-title3); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
@@ -1456,3 +1456,24 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .player-stage .player-controls { transition: opacity .32s var(--ease-out), translate .32s var(--ease-out); }
 .player-stage[data-chrome=off] .player-controls { translate: 0 8px; }
 :root[data-motion=off] .player-stage .player-controls { transition: none; translate: none; }
+/* Video zoom: − / level / + ; the level resets to 100%. */
+.zoom-control { display: inline-flex; align-items: center; gap: 0; }
+.zoom-level { min-width: 46px; height: 32px; padding: 0 6px; border-radius: 8px; color: inherit; font-size: var(--type-caption); font-variant-numeric: tabular-nums; text-align: center; }
+.zoom-level:hover:not(:disabled) { background: #ffffff1a; }
+.zoom-level:disabled { opacity: .7; cursor: default; }
+@media (max-width: 700px) {
+  .player-controls .playback-more .zoom-control { grid-column: 1 / -1; display: flex; justify-content: space-between; }
+  .player-controls .playback-more .zoom-control .icon-button { width: auto; flex: 1; }
+  .player-controls .playback-more .zoom-level { color: #e1e6f0; font-size: var(--type-callout); }
+}
+
+/* Video info actions replace the old per-card menu. */
+.info-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.info-actions .secondary-button { display: inline-flex; align-items: center; gap: 6px; }
+.info-move { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding: 0 4px 0 12px; border-radius: 999px; background: var(--group); border: 1px solid var(--line); color: var(--ink); }
+.info-move select { min-width: 0; max-width: 220px; border: 0; background: transparent; color: inherit; padding: 8px 4px; text-overflow: ellipsis; }
+/* Grid/list cards: the info button sits beside the title instead of over the thumbnail. */
+.video-info-button { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--muted); }
+.video-info-button:hover { background: var(--hover); color: var(--ink); }
+.video-list .video-card .video-info-button { height: auto; min-height: 34px; border-radius: 0; }
+.video-list .video-card .video-info-button:hover { background: none; color: var(--accent); }

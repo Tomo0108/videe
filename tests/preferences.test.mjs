@@ -5,7 +5,7 @@ test('malformed settings recover to safe playback and UI values',()=>{
   for(const input of [null,[],false,42,'bad']) assert.deepEqual(normalizePreferences(input),defaults);
   const settings=normalizePreferences({speed:99,volume:7,resume:'false',repeat:'invalid',theme:'invalid',layout:'invalid',sort:'invalid'});
   assert.equal(settings.speed,1);assert.equal(settings.volume,1);assert.equal(settings.resume,true);
-  assert.equal(settings.repeat,'off');assert.equal(settings.theme,'system');assert.equal(settings.layout,'list');
+  assert.equal(settings.repeat,'off');assert.equal(settings.theme,'system');assert.equal(settings.layout,'grid');
   assert.equal(defaults.motion,true);
   assert.equal(normalizePreferences({motion:false}).motion,false);
   assert.equal(normalizePreferences({motion:'off'}).motion,true);
@@ -32,4 +32,9 @@ test('repeat policy covers boundaries, one item, empty queues, and disabled auto
   assert.equal(nextOnEnded(1,2,'all',false),0);
   assert.equal(nextOnEnded(0,1,'all',false),0);
   assert.equal(nextOnEnded(-1,0,'all',true),-1);
+});
+test('grid becomes the default layout once, then the saved choice sticks',()=>{
+  assert.equal(normalizePreferences({layout:'list'}).layout,'grid');
+  assert.equal(normalizePreferences({layout:'list',layoutVersion:2}).layout,'list');
+  assert.equal(normalizePreferences({}).layout,'grid');
 });

@@ -65,7 +65,7 @@ try {
   await page.setViewportSize({width:390,height:844});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile library overflow');
   await page.screenshot({path:'/tmp/videe-redesign-mobile-library.png',fullPage:true});
-  await page.locator('summary[aria-label="Options for sample.mp4"]').click();
+  await page.getByRole('button',{name:'Info for sample.mp4',exact:true}).click();
   await page.getByRole('button',{name:'Remove from library',exact:true}).click();
   await page.getByRole('button',{name:'Remove',exact:true}).click();
   await dialogGone();

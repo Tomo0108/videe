@@ -26,6 +26,7 @@ try {
   await page.getByRole('button',{name:/Continue watching/}).filter({visible:true}).click();
   assert.equal(await page.locator('.video-card').count(),1);
   await page.getByRole('button',{name:/All videos/}).filter({visible:true}).click();
+  await page.getByRole('button',{name:'List view',exact:true}).click();
   await page.getByRole('button',{name:'Name',exact:true}).click();
   assert.equal(await page.locator('.video-title').first().innerText(),'Alpha');
   await page.getByRole('button',{name:'Grid view',exact:true}).click();
@@ -43,8 +44,7 @@ try {
   await page.getByRole('button',{name:'Previous video',exact:true}).click();
   await page.getByRole('heading',{name:'Alpha.mp4',exact:true}).waitFor();
   await page.getByRole('button',{name:'Back to library'}).click();
-  await page.locator('summary[aria-label="Options for Zulu.mp4"]').click();
-  await page.getByRole('button',{name:'Video info',exact:true}).click();
+  await page.getByRole('button',{name:'Info for Zulu.mp4',exact:true}).click();
   await page.getByRole('heading',{name:'Video info'}).waitFor();
   assert.match(await page.locator('.info-list').innerText(),/0:04/);
   await page.keyboard.press('Escape');
@@ -53,13 +53,14 @@ try {
   await page.getByRole('switch',{name:'Resume playback',exact:true}).uncheck();
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await dialogGone();
-  await page.locator('summary[aria-label="Options for Zulu.mp4"]').click();
+  await page.getByRole('button',{name:'Info for Zulu.mp4',exact:true}).click();
   await page.getByRole('button',{name:'Resume Zulu.mp4',exact:true}).click();
   await page.waitForFunction(()=>{const v=document.querySelector('.player-view video');return v.readyState>=2&&v.currentTime>=3.9&&!v.paused;});
   await page.locator('.player-view video').evaluate(v=>v.pause());
   await page.getByRole('button',{name:'Back to library'}).click();
-  await page.locator('summary[aria-label="Options for Zulu.mp4"]').click();
+  await page.getByRole('button',{name:'Info for Zulu.mp4',exact:true}).click();
   await page.getByRole('button',{name:'Reset watch history'}).click();
+  await page.keyboard.press('Escape');
   await page.reload();
   await page.getByRole('button',{name:/Continue watching/}).filter({visible:true}).click();
   await page.getByText('Nothing to continue').waitFor();

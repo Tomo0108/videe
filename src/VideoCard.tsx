@@ -1,5 +1,5 @@
 import {memo,useRef,type MutableRefObject} from 'react';
-import {AudioLines,Check,Ellipsis,Film,Folder,FolderOpen,Heart,Info,Play,RotateCcw,Trash2} from 'lucide-react';
+import {AudioLines,Check,Film,Folder,Heart,Info,Play} from 'lucide-react';
 import {sizeLabel,timeLabel} from './media.mjs';
 import {DRAG_TYPE} from './Sidebar';
 import type {MediaItem} from './store';
@@ -24,19 +24,6 @@ function playedLabel(item:MediaItem) {
   if (!item.lastPlayed) return '—';
   return new Intl.DateTimeFormat(locale(), { month: 'short', day: 'numeric' }).format(item.lastPlayed);
 }
-const closeMenu = (element:HTMLElement) => element.closest('details')?.removeAttribute('open');
-/** Opens the menu above its button when there is no room below (bottom rows, under the mini player). */
-const placeMenu = (menu:HTMLDetailsElement) => {
-  menu.removeAttribute('data-up');
-  if (!menu.open) return;
-  const panel = menu.querySelector<HTMLElement>('.menu-panel'); const trigger = menu.querySelector('summary');
-  if (!panel || !trigger) return;
-  const mini = document.querySelector('.mini-player')?.getBoundingClientRect();
-  const button = trigger.getBoundingClientRect();
-  const floor = Math.min(window.innerHeight, mini && mini.left < button.right && mini.right > button.left - panel.offsetWidth ? mini.top : Infinity) - 8;
-  const below = floor - button.bottom; const above = button.top - 8;
-  if (panel.offsetHeight + 6 > below && above > below) menu.setAttribute('data-up', '');
-};
 export const extension = (name:string) => /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toUpperCase() || '';
 
 /** One library row or card. Memoized so playback progress never re-renders the whole library. */
@@ -57,18 +44,7 @@ export const VideoCard = memo(function VideoCard({item,layout,selected,playing,f
       {layout === 'list' && <><span className="video-duration">{item.duration > 0 ? timeLabel(item.duration) : '—'}</span><span className="video-size">{sizeLabel(item.size)}</span><span className="video-played">{playedLabel(item)}</span></>}
     </button>
     <button type="button" className={`video-favorite${item.favorite ? ' active' : ''}`} aria-pressed={item.favorite} aria-label={item.favorite ? t('Unfavorite {name}', {name: item.name}) : t('Add {name} to favorites', {name: item.name})} title={item.favorite ? t('Unfavorite') : t('Add to favorites')} onClick={() => actions.current.favorite(item.id)}><Heart size={16} strokeWidth={1.8} fill={item.favorite ? 'currentColor' : 'none'} aria-hidden="true"/></button>
-    <details className="file-menu" onToggle={event => placeMenu(event.currentTarget)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }}>
-      <summary aria-label={t('Options for {name}', {name: item.name})} title={t('More')}><Ellipsis size={18} aria-hidden="true"/></summary>
-      <div className="menu-panel">
-        {inProgress && <button aria-label={t('Resume {name}', {name: item.name})} onClick={event => { closeMenu(event.currentTarget); actions.current.open(item, true); }}><Play size={16} aria-hidden="true"/>{t('Resume')}</button>}
-        <button onClick={event => { actions.current.info(item.id); closeMenu(event.currentTarget); }}><Info size={16} aria-hidden="true"/>{t('Video info')}</button>
-        {item.native && actions.current.reveal && <button onClick={event => { actions.current.reveal?.(item.id); closeMenu(event.currentTarget); }}><FolderOpen size={16} aria-hidden="true"/>{t('Show in folder')}</button>}
-        <button aria-label={t('Reset watch history')} disabled={!item.position && !item.lastPlayed} onClick={event => { actions.current.reset(item.id); closeMenu(event.currentTarget); }}><RotateCcw size={16} aria-hidden="true"/>{t('Reset')}</button>
-        <button onClick={event => { actions.current.favorite(item.id); closeMenu(event.currentTarget); }}><Heart size={16} aria-hidden="true"/>{item.favorite ? t('Unfavorite') : t('Add to favorites')}</button>
-        {folders.length > 0 && <div className="menu-move"><span className="menu-move-label">{t('Move to')}</span>{folders.some(folder => folder.ids.includes(item.id)) && <button aria-label={t('Remove from folder')} onClick={event => { actions.current.move([item.id], ''); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/>{t('Remove from folder')}</button>}{folders.map(folder => <button key={folder.id} aria-label={t('Move to {name}', {name: folder.name})} onClick={event => { actions.current.move([item.id], folder.id); closeMenu(event.currentTarget); }}><Folder size={16} aria-hidden="true"/><span className="menu-label" title={folder.name}>{folder.name}</span></button>)}</div>}
-        <button className="delete-action" onClick={event => { actions.current.remove(item.id); closeMenu(event.currentTarget); }}><Trash2 size={16} aria-hidden="true"/>{t('Remove from library')}</button>
-      </div>
-    </details>
+    <button type="button" className="video-info-button" aria-label={t('Info for {name}', {name: item.name})} title={t('Info')} onClick={() => actions.current.info(item.id)}><Info size={17} aria-hidden="true"/></button>
   </article>;
 });
 

@@ -24,7 +24,7 @@ try {
  result=await inspect();assert.ok(result.videos[0].position>=4.9);assert.equal(await page.evaluate(()=>window.mediaWrites),0);
  await page.reload();await page.getByRole('button',{name:'Play Legacy.mp4'}).click();await page.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
  await page.getByRole('button',{name:'Back to library'}).click();
- await page.getByLabel('Options for Legacy.mp4').click();await page.getByRole('button',{name:'Remove from library',exact:true}).click();await page.getByRole('button',{name:'Remove',exact:true}).click();
+ await page.getByLabel('Info for Legacy.mp4').click();await page.getByRole('button',{name:'Remove from library',exact:true}).click();await page.getByRole('button',{name:'Remove',exact:true}).click();
  await page.getByRole('heading',{name:'No videos',exact:true}).waitFor();result=await inspect();assert.deepEqual(result.videos,[]);assert.deepEqual(result.media,[]);
  console.log('PASS: v1 migration preserves video, favorite and resume; metadata updates never rewrite media; lazy playback after reload; atomic media deletion.');
 } finally {await browser.close();}

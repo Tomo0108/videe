@@ -1,7 +1,7 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart, CircleHelp, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ZoomOut, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart, CircleHelp, BookOpen, Sparkles } from 'lucide-react';
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
@@ -35,6 +35,7 @@ type GpuStatus = { videoDecode: string; gpuCompositing: string; rasterization: s
 type Engine = 'direct' | 'live';
 /** Controls fade after this much stillness while playing, and almost at once when the pointer leaves the player. */
 const CHROME_IDLE_MS = 1600;
+const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3, 4];
 const CHROME_LEAVE_MS = 150;
 type JobKind = 'convert' | 'prepare' | 'export';
 // Files above this size start in live playback instead of waiting for a remux.
@@ -523,6 +524,15 @@ export default function App() {
     return {x:Math.max(-maxX,Math.min(maxX,x)),y:Math.max(-maxY,Math.min(maxY,y))};
   }, []);
   const resetVideoView = useCallback(() => { setVideoZoom(1); setVideoPan({x:0,y:0}); }, []);
+  /** Step the picture's magnification (100% → 125% → 150% → 200% → 300% → 400%), keeping the view inside the frame. */
+  const zoomVideo = useCallback((direction: -1 | 1) => {
+    setVideoZoom(current => {
+      const next = direction > 0 ? ZOOM_STEPS.find(step => step > current + 0.01) ?? current : [...ZOOM_STEPS].reverse().find(step => step < current - 0.01) ?? 1;
+      setVideoPan(pan => next <= 1 ? {x:0,y:0} : clampVideoPan(pan.x, pan.y, next));
+      showOsd(t('Zoom {n}%', {n: Math.round(next * 100)}));
+      return next;
+    });
+  }, [clampVideoPan, showOsd]);
   const fillScreen = useCallback(async () => {
     const stage = stageRef.current; const video = videoRef.current;
     if (!stage || !video || !video.videoWidth || !video.videoHeight) return;
@@ -1096,7 +1106,7 @@ export default function App() {
               </div>
               <div className="playback-options" ref={playbackOptionsRef}>
                 <IconButton icon={controlsLocked ? LockKeyhole : LockKeyholeOpen} label={controlsLocked ? t('Unlock controls') : t('Lock controls')} active={controlsLocked} disabled={blockingJob} className="lock-toggle" onClick={()=>{setControlsLocked(locked=>!locked);setChrome(true);}}/>
-                <div className="playback-more" id="playback-more" inert={controlsLocked||undefined} onClick={event => { const button = (event.target as HTMLElement).closest('button'); if (button && (!button.hasAttribute('aria-pressed') || button.classList.contains('more-lock'))) setMoreOpen(false); }}>
+                <div className="playback-more" id="playback-more" inert={controlsLocked||undefined} onClick={event => { const button = (event.target as HTMLElement).closest('button'); if (button && !button.closest('.zoom-control') && (!button.hasAttribute('aria-pressed') || button.classList.contains('more-lock'))) setMoreOpen(false); }}>
                   <IconButton icon={controlsLocked ? LockKeyhole : LockKeyholeOpen} label={controlsLocked ? t('Unlock controls') : t('Lock controls')} active={controlsLocked} disabled={blockingJob} className="more-lock" onClick={()=>{setControlsLocked(locked=>!locked);setChrome(true);}}/>
                   <IconButton icon={LoopRangeIcon} label={t('Loop')} active={looping} disabled={!duration || !!error || blockingJob} onClick={toggleLoop}/>
                   <IconButton icon={prefs.repeat==='one'?Repeat1:Repeat} label={prefs.repeat==='off'?t('Repeat: Off'):prefs.repeat==='one'?t('Repeat: One'):t('Repeat: All')} active={prefs.repeat!=='off'} onClick={()=>setPrefs({...prefs,repeat:prefs.repeat==='off'?'one':prefs.repeat==='one'?'all':'off'})}/>
@@ -1106,8 +1116,11 @@ export default function App() {
                   <IconButton icon={Camera} label={t('Save frame')} disabled={!source || !!error} onClick={() => void snapshot()}/>
                   <IconButton icon={Info} label={t('Playback details')} onClick={() => setModal('playback')}/>
                   <IconButton icon={PictureInPicture2} label={t('Picture in Picture')} onClick={() => void pictureInPicture()}/>
-                  <IconButton icon={ZoomIn} label={t('Fill screen')} disabled={!source || !!error} onClick={() => void fillScreen()}/>
-                  {videoZoom>1 && <IconButton icon={RotateCcw} label={t('Reset video view')} onClick={resetVideoView}/>}
+                  <div className="zoom-control" role="group" aria-label={t('Video zoom')}>
+                    <IconButton icon={ZoomOut} label={t('Zoom out')} disabled={!source || !!error || videoZoom <= 1} onClick={() => zoomVideo(-1)}/>
+                    <button type="button" className="zoom-level" aria-label={t('Reset zoom')} title={t('Reset zoom')} disabled={!source || !!error || videoZoom === 1} onClick={resetVideoView}>{Math.round(videoZoom * 100)}%</button>
+                    <IconButton icon={ZoomIn} label={t('Zoom in')} disabled={!source || !!error || videoZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1]} onClick={() => zoomVideo(1)}/>
+                  </div>
                 </div>
                 <IconButton icon={isFullscreen ? Minimize : Maximize} label={isFullscreen ? t('Exit full screen') : t('Full screen')} onClick={() => void fullscreen()}/>
                 <button type="button" className="icon-button more-toggle" aria-label={t('More controls')} title={t('More controls')} aria-haspopup="true" aria-expanded={moreOpen} aria-controls="playback-more" onClick={() => setMoreOpen(open => !open)}><Ellipsis size={18} strokeWidth={1.8} aria-hidden="true"/></button>
@@ -1235,7 +1248,14 @@ export default function App() {
       return <Modal title={t('Video info')} onClose={()=>setInfoId(null)}>
         <p className="info-name" title={info.name}>{info.name}</p>
         <dl className="info-list video-info-list">{rows.map(([label, value]) => <div key={label}><dt>{t(label)}</dt><dd title={value}>{value}</dd></div>)}</dl>
-        {info.native && window.videe?.revealVideo && <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => void window.videe?.revealVideo(info.id)}><FolderOpen size={15} aria-hidden="true"/>{t('Show in folder')}</button></div>}
+        <div className="info-actions">
+          {(() => { const resumable = info.position > 0 && info.duration > 0 && info.position < info.duration - 2; return <button type="button" className="secondary-button" aria-label={resumable ? t('Resume {name}', {name: info.name}) : t('Play {name}', {name: info.name})} onClick={() => { setInfoId(null); cardActions.current.open(info, resumable); }}><Play size={15} aria-hidden="true"/>{resumable ? t('Resume') : t('Play')}</button>; })()}
+          <button type="button" className="secondary-button" aria-pressed={info.favorite} onClick={() => cardActions.current.favorite(info.id)}><Heart size={15} fill={info.favorite ? 'currentColor' : 'none'} aria-hidden="true"/>{info.favorite ? t('Unfavorite') : t('Add to favorites')}</button>
+          {info.native && window.videe?.revealVideo && <button type="button" className="secondary-button" onClick={() => void window.videe?.revealVideo(info.id)}><FolderOpen size={15} aria-hidden="true"/>{t('Show in folder')}</button>}
+          <button type="button" className="secondary-button" aria-label={t('Reset watch history')} disabled={!info.position && !info.lastPlayed} onClick={() => cardActions.current.reset(info.id)}><RotateCcw size={15} aria-hidden="true"/>{t('Reset')}</button>
+          {folders.length > 0 && <label className="info-move"><Folder size={15} aria-hidden="true"/><span className="sr-only">{t('Move to')}</span><select aria-label={t('Move to folder')} value={folders.find(folder => folder.ids.includes(info.id))?.id || ''} onChange={e => cardActions.current.move([info.id], e.target.value)}><option value="">{t('No folder')}</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>}
+          <button type="button" className="secondary-button collection-delete-action" onClick={() => { setInfoId(null); cardActions.current.remove(info.id); }}><Trash2 size={15} aria-hidden="true"/>{t('Remove from library')}</button>
+        </div>
       </Modal>;
     })()}
     {deleteIds && deleteIds.length > 0 && <Modal title={t('Remove from library')} onClose={() => setDeleteIds(null)}><p className="delete-filename">{deleteIds.length === 1 ? (items.find(item => item.id === deleteIds[0])?.name || t('This video')) : t('{n} videos', { n: deleteIds.length })}</p><p className="subtle-text">{deleteIds.length === 1 ? t('The original file stays.') : t('Original files stay.')}</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteIds(null)}>{t('Cancel')}</button><button className="danger-button" onClick={() => void confirmDelete()}>{t('Remove')}</button></div></Modal>}

@@ -40,13 +40,12 @@ try {
   assert.match(await page.locator('.library-sidebar nav button').first().innerText(), /All videos/);
   assert.equal(await page.locator('.library-tabs .tab-label').first().textContent(), 'All');
   assert.equal(await page.locator('.library-count').isVisible(), true);
-  const menu = page.locator('summary[aria-label="Options for sample.mp4"]');
-  await menu.focus();
+  const info = page.getByRole('button', { name: 'Info for sample.mp4', exact: true });
+  await info.focus();
   await page.keyboard.press('Space');
-  await page.getByRole('button', { name: 'Video info', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Video info' }).waitFor();
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('.file-menu').getAttribute('open'), null);
-  assert.equal(await menu.evaluate(el => el === document.activeElement), true);
+  await page.locator('dialog').waitFor({ state: 'detached' });
   await page.getByRole('searchbox', { name: 'Search videos' }).fill('missing');
   await page.getByRole('button', { name: 'Reset search' }).click();
   assert.equal(await page.locator('.video-card').count(), 1);
