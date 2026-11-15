@@ -16,7 +16,17 @@ let win, registry = {}, processJob, registryFile, cacheDir, liveJob;
 let writeQueue = Promise.resolve();
 let mediaModule;
 const media = () => (mediaModule ||= import('../src/media.mjs'));
-function persist() { writeQueue = writeQueue.then(async () => { const tmp = registryFile + '.tmp'; await fs.writeFile(tmp, JSON.stringify(registry)); await fs.rename(tmp, registryFile); }); return writeQueue; }
+// Writes are coalesced: changes made while a write is waiting to start ride along with it,
+// so analyzing a large folder writes the registry a handful of times instead of once per file.
+let pendingWrite;
+function persist() {
+  if (pendingWrite) return pendingWrite;
+  pendingWrite = writeQueue = writeQueue.catch(() => {}).then(async () => {
+    pendingWrite = undefined;
+    const tmp = registryFile + '.tmp'; await fs.writeFile(tmp, JSON.stringify(registry)); await fs.rename(tmp, registryFile);
+  });
+  return pendingWrite;
+}
 function ffmpegBinary() { return require('ffmpeg-static').replace('app.asar', 'app.asar.unpacked'); }
 function ffmpegProbe(input) {
   return new Promise(resolve => {
@@ -81,18 +91,36 @@ function hardwareEncoder() {
     return '';
   })());
 }
-async function analyze(id) {
+async function probeKey(input) {
+  const stat = await fs.stat(input);
+  return { key: `${input}|${stat.size}|${stat.mtimeMs}`, size: stat.size };
+}
+// One probe per file at a time: a preview read waits for a probe that is already running.
+// Opening a video never waits on a preview read (which also decodes a frame); it probes on its own.
+const analyzing = new Map();
+/** `read` optionally replaces the plain probe with an ffmpeg run that also does other work and returns its stderr. */
+function analyze(id, read) {
+  const running = analyzing.get(id);
+  if (running) return running;
+  if (read) return analyzeNow(id, read);
+  const job = analyzeNow(id).finally(() => { if (analyzing.get(id) === job) analyzing.delete(id); });
+  analyzing.set(id, job);
+  return job;
+}
+async function analyzeNow(id, read = ffmpegProbe) {
   const entry = registry[id];
   if (!entry) throw new Error('Video not found.');
   const input = entry.converted || entry.path;
-  const stat = await fs.stat(input);
-  const key = `${input}|${stat.size}|${stat.mtimeMs}`;
+  const { key, size } = await probeKey(input);
   if (entry.probe?.key === key) return entry.probe.value;
-  const { parseMediaInfo, playbackPlan } = await media();
-  const info = parseMediaInfo(await ffmpegProbe(input));
+  const { parseMediaInfo, playbackPlan, parseSubtitleStreams, inputSection } = await media();
+  const text = inputSection(await read(input));
+  const info = parseMediaInfo(text);
+  // The original's subtitle list comes from the same probe, so opening a video doesn't run ffmpeg again for it.
+  if (input === entry.path) entry.subs = { key, tracks: parseSubtitleStreams(text) };
   const known = !!(info.video || info.audio.length);
   const plan = known ? playbackPlan(info, { platform: process.platform }) : { mode: 'direct', reasons: [], audio: 'copy', deinterlace: false };
-  const value = { info, plan, known, converted: entry.converted ? (entry.convertedKind || 'optimized') : '', size: stat.size };
+  const value = { info, plan, known, converted: entry.converted ? (entry.convertedKind || 'optimized') : '', size };
   entry.probe = { key, value };
   await persist();
   return value;
@@ -143,16 +171,36 @@ async function liveResponse(request, id, start, hardware, token) {
 function frameArgs(input, time, filter, codec) {
   return ['-hide_banner', '-nostdin', '-loglevel', 'error', ...(time > 0 ? ['-ss', Number(time).toFixed(3)] : []), '-i', input, '-map', '0:V:0?', '-frames:v', '1', ...(filter ? ['-vf', filter] : []), '-f', 'image2pipe', '-c:v', codec, ...(codec === 'mjpeg' ? ['-q:v', '5'] : []), 'pipe:1'];
 }
-function grabFrame(input, time, filter, codec = 'mjpeg') {
+/** Read one frame. With `withInfo`, ffmpeg also reports the file's streams so no separate probe is needed. */
+function grabFrame(input, time, filter, codec = 'mjpeg', withInfo = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegBinary(), frameArgs(input, time, filter, codec), { windowsHide: true });
+    const args = frameArgs(input, time, filter, codec);
+    if (withInfo) args.splice(args.indexOf('-loglevel'), 2);
+    const child = spawn(ffmpegBinary(), args, { windowsHide: true });
     const chunks = [];
+    let stderr = '';
     const timer = setTimeout(() => child.kill('SIGKILL'), 15000);
     child.stdout.on('data', chunk => chunks.push(chunk));
-    child.stderr.resume();
+    if (withInfo) child.stderr.on('data', data => { if (stderr.length < 200000) stderr += data; }); else child.stderr.resume();
     child.on('error', () => { clearTimeout(timer); reject(new Error('Could not read a frame.')); });
-    child.on('close', code => { clearTimeout(timer); const data = Buffer.concat(chunks); if (code === 0 && data.length) resolve(data); else reject(new Error('Could not read a frame.')); });
+    child.on('close', code => {
+      clearTimeout(timer);
+      const data = Buffer.concat(chunks);
+      if (withInfo) resolve({ data: code === 0 ? data : Buffer.alloc(0), stderr });
+      else if (code === 0 && data.length) resolve(data); else reject(new Error('Could not read a frame.'));
+    });
   });
+}
+/** Text subtitle tracks of the original file, from the cached probe when the file is unchanged. */
+async function subtitleTracks(entry) {
+  const input = entry.path;
+  const { key } = await probeKey(input);
+  if (entry.subs?.key === key) return entry.subs.tracks;
+  const { parseSubtitleStreams } = await media();
+  const tracks = parseSubtitleStreams(await ffmpegProbe(input));
+  entry.subs = { key, tracks };
+  void persist();
+  return tracks;
 }
 function exportInput(entry) { return entry.converted && entry.convertedKind === 'edited' ? entry.converted : entry.path; }
 function register(channel, handler) { ipcMain.handle(channel, async (event, ...args) => { if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame) throw new Error('Unauthorized'); return handler(...args); }); }
@@ -166,14 +214,20 @@ async function importPaths(filePaths) {
     if (stat.isDirectory()) collected.push(...await collectVideoPaths(file, { maxFiles: 1000 - collected.length }));
     else if (stat.isFile()) collected.push(file);
   }
+  // Sizes are read in parallel; a large folder no longer waits on one disk round trip per file.
+  const files = collected.slice(0, 1000);
+  const stats = new Array(files.length);
+  let next = 0;
+  const worker = async () => { while (next < files.length) { const index = next++; try { stats[index] = await fs.stat(files[index]); } catch { stats[index] = null; } } };
+  await Promise.all(Array.from({ length: Math.min(16, files.length) }, worker));
+  const ids = new Map(Object.entries(registry).map(([id, entry]) => [entry.path, id]));
   const records = [];
-  for (const file of collected.slice(0, 1000)) {
-    let stat;
-    try { stat = await fs.stat(file); } catch { continue; }
-    if (!stat.isFile()) continue;
-    const existing = Object.entries(registry).find(([,entry]) => entry.path === file);
-    const id = existing?.[0] || randomUUID(); registry[id] ||= { path: file };
-    records.push({ id, name: basename(file), size: stat.size, native: true, type: '', added: Date.now(), duration: 0, position: 0, favorite: false, lastPlayed: 0 });
+  const added = Date.now();
+  for (const [index, file] of files.entries()) {
+    const stat = stats[index];
+    if (!stat?.isFile()) continue;
+    const id = ids.get(file) || randomUUID(); registry[id] ||= { path: file }; ids.set(file, id);
+    records.push({ id, name: basename(file), size: stat.size, native: true, type: '', added, duration: 0, position: 0, favorite: false, lastPlayed: 0 });
   }
   await persist(); return records;
 }
@@ -307,10 +361,14 @@ app.whenReady().then(async () => {
     const entry = registry[id];
     if (!entry) throw new Error('Video not found.');
     const input = entry.converted || entry.path;
-    const { info } = await analyze(id);
+    const filter = 'scale=640:640:force_original_aspect_ratio=decrease';
+    const frameTime = duration => duration > 0 ? Math.min(1, duration / 10) : 0;
+    // Not probed yet: one ffmpeg run reads the frame at 1 s and the stream layout together.
+    // Files shorter than 10 s are read again at a tenth of their length, as before.
+    let first;
+    const { info } = await analyze(id, async file => { first = await grabFrame(file, 1, filter, 'mjpeg', true); return first.stderr; });
     if (!info.video) throw new Error('No video stream.');
-    const time = info.duration > 0 ? Math.min(1, info.duration / 10) : 0;
-    const data = await grabFrame(input, time, 'scale=640:640:force_original_aspect_ratio=decrease');
+    const data = first?.data.length && frameTime(info.duration) === 1 ? first.data : await grabFrame(input, frameTime(info.duration), filter);
     return { thumbnail: `data:image/jpeg;base64,${data.toString('base64')}`, duration: info.duration };
   });
   register('filmstrip', async (id, count = 16) => {
@@ -438,20 +496,16 @@ app.whenReady().then(async () => {
   register('list-subtitles', async id => {
     const entry = registry[id];
     if (!entry) throw new Error('Video not found.');
-    const input = entry.path || entry.converted;
-    await fs.access(input);
-    const { parseSubtitleStreams } = await media();
-    return parseSubtitleStreams(await ffmpegProbe(input));
+    return subtitleTracks(entry);
   });
   register('extract-subtitle', async (id, index) => {
     const entry = registry[id];
     if (!entry) throw new Error('Video not found.');
     if (!Number.isInteger(index) || index < 0 || index > 31) throw new Error('Subtitle track not found.');
-    const input = entry.path || entry.converted;
+    const input = entry.path;
     await fs.access(ffmpegBinary());
-    await fs.access(input);
-    const { parseSubtitleStreams, toVtt } = await media();
-    const tracks = parseSubtitleStreams(await ffmpegProbe(input));
+    const { toVtt } = await media();
+    const tracks = await subtitleTracks(entry);
     if (!tracks.some(track => track.index === index)) throw new Error('Subtitle track not found.');
     const text = await new Promise((resolve, reject) => {
       const child = spawn(ffmpegBinary(), ['-hide_banner', '-nostdin', '-i', input, '-map', `0:s:${index}`, '-f', 'webvtt', 'pipe:1'], { windowsHide: true });

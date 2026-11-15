@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {readMediaBlob,type MediaItem} from './store';
+import {thumbnailBatch} from './thumbnail-queue.mjs';
 export const THUMBNAIL_VERSION = 2;
 export function needsThumbnail(item: Pick<MediaItem,'thumbnail'|'thumbnailVersion'>) {
   return !item.thumbnail || item.thumbnailVersion !== THUMBNAIL_VERSION;
@@ -101,61 +102,71 @@ function attachCaptureVideo() {
   document.body.append(video);
   return video;
 }
-/** Generates missing previews one at a time. `skip` is the file the player is using right now. */
+/** Generates missing previews. `skip` is the file the player is using right now. */
 export function useThumbnails(items:MediaItem[],paused:boolean,update:(id:string,data:Partial<MediaItem>)=>void,skip=''){
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const attempted = useRef(new Set<string>());
+  const running = useRef(new Map<string, AbortController>());
   const [, kick] = useState(0);
-  const nextId = paused ? '' : items.find(item => item.id !== skip && needsPreview(item) && !attempted.current.has(item.id))?.id || '';
+  const batchKey = paused ? '' : thumbnailBatch(items, { needs: needsPreview, skip, attempted: attempted.current, nativeFrames: !!window.videe?.thumbnail }).map(item => item.id).join('\n');
+  // Jobs that left the batch (playback started, file removed) are cancelled; jobs still in it keep running.
   useEffect(() => {
-    if (!nextId) return;
-    const item = itemsRef.current.find(entry => entry.id === nextId);
-    if (!item) return;
-    const abort = new AbortController();
-    let local = '';
-    const video = attachCaptureVideo();
-    const run = async () => {
-      // The desktop app reads frames with FFmpeg, so every format gets a preview,
-      // including codecs the built-in decoder cannot show.
-      if (item.native && window.videe?.thumbnail) {
-        try {
-          const frame = await window.videe.thumbnail(item.id);
-          if (abort.signal.aborted) return;
-          if (needsThumbnail(item)) update(item.id, { thumbnail: frame.thumbnail, thumbnailVersion: THUMBNAIL_VERSION, duration: frame.duration || item.duration });
-          else if (frame.duration > 0) update(item.id, { duration: frame.duration });
-          video.remove();
-          return;
-        } catch { if (abort.signal.aborted) return; }
-      }
-      try {
-        const source = await sourceFor(item);
-        if (abort.signal.aborted) { if (source.local) URL.revokeObjectURL(source.src); return; }
-        local = source.local ? source.src : '';
-        if (source.src.startsWith('videe:')) video.crossOrigin = 'anonymous';
-        video.src = source.src;
-        if (video.readyState < 1) await whenReady(video, 'loadedmetadata', abort.signal);
-        const duration = Number.isFinite(video.duration) ? video.duration : 0;
-        if (abort.signal.aborted) return;
-        if (needsThumbnail(item)) {
-          await waitForPaint(video, abort.signal);
-          if (abort.signal.aborted) return;
-          update(item.id, {...captureFrame(video), duration});
-        } else if (duration > 0) {
-          update(item.id, { duration });
-        }
-      } catch (error) {
-        if (abort.signal.aborted || isAbort(error)) return;
-        attempted.current.add(item.id);
-        kick(value => value + 1);
-      } finally {
-        video.removeAttribute('src');
-        video.load();
-        video.remove();
-        if (local) URL.revokeObjectURL(local);
-      }
-    };
-    void run();
-    return () => abort.abort();
-  }, [nextId, update]);
+    const wanted = new Set(batchKey ? batchKey.split('\n') : []);
+    for (const [id, abort] of running.current) if (!wanted.has(id)) { abort.abort(); running.current.delete(id); }
+    for (const id of wanted) {
+      if (running.current.has(id)) continue;
+      const item = itemsRef.current.find(entry => entry.id === id);
+      if (!item) continue;
+      const abort = new AbortController();
+      running.current.set(id, abort);
+      void generate(item, abort.signal, update).then(ok => {
+        if (running.current.get(id) === abort) running.current.delete(id);
+        if (!ok && !abort.signal.aborted) attempted.current.add(id);
+        if (!abort.signal.aborted) kick(value => value + 1);
+      });
+    }
+  }, [batchKey, update]);
+  useEffect(() => () => { for (const abort of running.current.values()) abort.abort(); running.current.clear(); }, []);
+}
+/** Make one preview. Resolves false when the file can't produce one, so it isn't retried. */
+async function generate(item: MediaItem, signal: AbortSignal, update: (id:string,data:Partial<MediaItem>)=>void): Promise<boolean> {
+  // The desktop app reads frames with FFmpeg, so every format gets a preview,
+  // including codecs the built-in decoder cannot show.
+  if (item.native && window.videe?.thumbnail) {
+    try {
+      const frame = await window.videe.thumbnail(item.id);
+      if (signal.aborted) return true;
+      if (needsThumbnail(item)) update(item.id, { thumbnail: frame.thumbnail, thumbnailVersion: THUMBNAIL_VERSION, duration: frame.duration || item.duration });
+      else if (frame.duration > 0) update(item.id, { duration: frame.duration });
+      return true;
+    } catch { if (signal.aborted) return true; }
+  }
+  let local = '';
+  const video = attachCaptureVideo();
+  try {
+    const source = await sourceFor(item);
+    if (signal.aborted) { if (source.local) URL.revokeObjectURL(source.src); return true; }
+    local = source.local ? source.src : '';
+    if (source.src.startsWith('videe:')) video.crossOrigin = 'anonymous';
+    video.src = source.src;
+    if (video.readyState < 1) await whenReady(video, 'loadedmetadata', signal);
+    const duration = Number.isFinite(video.duration) ? video.duration : 0;
+    if (signal.aborted) return true;
+    if (needsThumbnail(item)) {
+      await waitForPaint(video, signal);
+      if (signal.aborted) return true;
+      update(item.id, {...captureFrame(video), duration});
+    } else if (duration > 0) {
+      update(item.id, { duration });
+    }
+    return true;
+  } catch (error) {
+    return signal.aborted || isAbort(error);
+  } finally {
+    video.removeAttribute('src');
+    video.load();
+    video.remove();
+    if (local) URL.revokeObjectURL(local);
+  }
 }

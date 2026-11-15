@@ -99,6 +99,18 @@ function clockSeconds(value) {
 }
 
 /**
+ * The input description from an ffmpeg run that also wrote an output.
+ * Lets one ffmpeg call both grab a frame and report the file's streams, without the
+ * output streams being mistaken for the file's own.
+ * @param {string} stderr
+ */
+export function inputSection(stderr) {
+  const text = String(stderr || '');
+  const end = text.search(/^(?:Stream mapping:|Output #0)/m);
+  return end < 0 ? text : text.slice(0, end);
+}
+
+/**
  * Read the stream layout that `ffmpeg -i` prints to stderr.
  * @param {string} stderr
  */

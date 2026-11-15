@@ -50,3 +50,14 @@ test('browser folder walk collects nested videos and skips notes', async () => {
   assert.deepEqual(files.map(file => file.name), ['Clip.MP4']);
   assert.equal(files[0].webkitRelativePath, 'nested/Clip.MP4');
 });
+
+import { inputSection as inputOnly, parseMediaInfo as parseInfo } from '../src/media.mjs';
+test('a frame grab reports only the input file streams', () => {
+  const stderr = `Input #0, matroska,webm, from 'a.mkv':\n  Duration: 00:01:00.00, start: 0.000000, bitrate: 8000 kb/s\n  Stream #0:0: Video: h264 (High), yuv420p(progressive), 1920x1080, 30 fps, 30 tbr\n  Stream #0:1: Audio: aac (LC), 44100 Hz, mono, fltp\n  Stream #0:2(jpn): Subtitle: subrip\nStream mapping:\n  Stream #0:0 -> #0:0 (h264 (native) -> mjpeg (native))\nOutput #0, image2pipe, to 'pipe:1':\n  Stream #0:0: Video: mjpeg, yuvj420p(pc, progressive), 640x360, q=2-31, 30 fps\n`;
+  const info = parseInfo(inputOnly(stderr));
+  assert.equal(info.video.codec, 'h264');
+  assert.equal(info.video.width, 1920);
+  assert.equal(info.duration, 60);
+  assert.equal(info.subtitles, 1);
+  assert.equal(inputOnly('no output'), 'no output');
+});

@@ -36,7 +36,8 @@
     "test:organization": "node scripts/verify-organization.mjs",
     "test:collections": "node scripts/verify-collections.mjs",
     "test:folder": "node scripts/verify-folder.mjs",
-    "test:guide": "node scripts/verify-guide.mjs"
+    "test:guide": "node scripts/verify-guide.mjs",
+    "bench:desktop": "node scripts/bench-desktop.mjs"
   },
   "build": {
     "appId": "app.videe.player",

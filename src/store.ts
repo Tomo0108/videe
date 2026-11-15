@@ -69,6 +69,20 @@ export async function saveItem(item: MediaItem): Promise<void> {
   await done;
   if (writeBlob) storedBlobs.add(item.id);
 }
+/** Save many new videos in one transaction, so importing a large folder doesn't wait on one commit per file. */
+export async function saveItems(items: MediaItem[]): Promise<void> {
+  if (!items.length) return;
+  const db = await dbPromise;
+  const transaction = db.transaction(['videos', 'progress'], 'readwrite');
+  const done = completed(transaction);
+  const videos = transaction.objectStore('videos'); const progress = transaction.objectStore('progress');
+  for (const item of items) {
+    const { blob, sessionUrl, ...metadata } = item;
+    videos.put(metadata);
+    progress.put({id: item.id, position: item.position});
+  }
+  await done;
+}
 export async function removeItem(id: string): Promise<void> {
   const db = await dbPromise;
   const transaction = db.transaction(['videos', 'media', 'progress'], 'readwrite');

@@ -5,7 +5,7 @@ import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen
 import { normalizePreferences, nextOnEnded, SPEEDS, stepSpeed, type Preferences } from './preferences.mjs';
 import appPackage from '../package.json';
 import type { LucideIcon, LucideProps } from 'lucide-react';
-import { readLibrary, readMediaBlob, renameItems, saveItem, savePosition, removeItem, type MediaItem } from './store';
+import { readLibrary, readMediaBlob, renameItems, saveItem, saveItems, savePosition, removeItem, type MediaItem } from './store';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
 type OpenedFile = { url: string; path: string; name: string; type: string };
@@ -376,8 +376,9 @@ export default function App() {
     } finally { setBusy(false); }
   };
   const addNativeRecords = async (picked: MediaItem[], folderName = '', folders: {name:string;ids:string[]}[] = []) => {
-    const fresh = picked.filter(p => !itemsRef.current.some(i => i.id === p.id)).map(p=>({...p,originalName:p.name,name:importedName(p.name)}));
-    for(const item of fresh) await saveItem(item);
+    const known = new Set(itemsRef.current.map(i => i.id));
+    const fresh = picked.filter(p => !known.has(p.id)).map(p=>({...p,originalName:p.name,name:importedName(p.name)}));
+    await saveItems(fresh);
     const next = [...itemsRef.current,...fresh]; itemsRef.current=next; setItems(next);
     const named = folders.filter(folder => folder.name && folder.ids.length);
     if(named.length) fileIntoFolders(named, folderName);
