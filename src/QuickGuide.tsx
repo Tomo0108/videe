@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import type {LucideIcon} from 'lucide-react';
-import {ArrowLeft,Camera,Captions,Download,Ellipsis,FastForward,FolderOpen,FolderPlus,Lightbulb,Heart,Keyboard,LayoutGrid,LifeBuoy,List,ListPlus,LockKeyhole,Maximize,MonitorCog,Play,Rewind,Scissors,Search,Settings2,ShieldCheck,Sparkles,Upload} from 'lucide-react';
+import {ArrowLeft,Camera,Captions,Download,FastForward,FolderOpen,FolderPlus,Info,Lightbulb,Heart,Keyboard,LayoutGrid,LifeBuoy,List,ListPlus,LockKeyhole,Maximize,MonitorCog,Play,Rewind,Scissors,Search,Settings2,ShieldCheck,Sparkles,Upload} from 'lucide-react';
 import {Modal} from './Modal';
 import shots from './guide/shots.json';
 import {guideEdition} from './onboarding.mjs';
@@ -59,7 +59,7 @@ function stepsJa(os: Edition): Step[] {
     {mark: 'collections', body: <><UI icon={FolderPlus}/> でフォルダー、<UI icon={ListPlus}/> でプレイリストを作ります。動画をドラッグして入れられます。</>},
     {mark: 'search', body: <><UI icon={Search}>{t('Search…')}</UI> にファイル名の一部を入力して絞り込みます。</>},
     {mark: 'layout', body: <><UI icon={LayoutGrid}/> サムネイル表示と <UI icon={List}/> リスト表示を切り替えます。リストでは列名を押すと並べ替えできます。</>},
-    {mark: 'row', body: <>動画をクリックすると再生します。<UI icon={Ellipsis}/> から名前の確認、フォルダーへの移動、ライブラリからの削除ができます。</>},
+    {mark: 'row', body: <>動画をクリックすると再生します。<UI icon={Info}/> で長さやサイズなどの情報を確認でき、フォルダーへの移動やライブラリからの削除もここからできます。</>},
   ]},
   {id: 'play', title: '再生する', icon: Play, shot: 'player', lead: 'プレイヤーの操作バーはマウスを動かすと表示されます。前回の続きから自動で再生されます。', points: [
     {mark: 'back', body: <><UI icon={ArrowLeft}/> でライブラリに戻ります。再生はミニプレイヤーで続きます。</>},
@@ -129,7 +129,7 @@ function stepsEn(os: Edition): Step[] {
     {mark: 'collections', body: <><UI icon={FolderPlus}/> creates a folder and <UI icon={ListPlus}/> a playlist. Drag videos onto them to add them.</>},
     {mark: 'search', body: <>Type part of a file name in <UI icon={Search}>{t('Search…')}</UI> to filter the list.</>},
     {mark: 'layout', body: <><UI icon={LayoutGrid}/> shows thumbnails and <UI icon={List}/> a list. In the list, press a column name to sort.</>},
-    {mark: 'row', body: <>Click a video to play it. <UI icon={Ellipsis}/> shows its details, moves it to a folder or removes it from the library.</>},
+    {mark: 'row', body: <>Click a video to play it. <UI icon={Info}/> shows its length, size and other details, and moves it to a folder or removes it from the library.</>},
   ]},
   {id: 'play', title: 'Play', icon: Play, shot: 'player', lead: 'The player controls appear when you move the mouse. Videos pick up where you left off.', points: [
     {mark: 'back', body: <><UI icon={ArrowLeft}/> goes back to the library. Playback continues in the mini player.</>},

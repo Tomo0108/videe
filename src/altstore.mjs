@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.18': 'A richer look throughout: poster-style cards that lift on hover, a darkened screening room with a frosted control bar and accent seek bar while watching, a Video info sheet with the artwork up top, a friendlier empty library, deeper light and dark themes, and bottom sheets on phones.',
   '0.1.17': 'The library opens in grid view, the player zooms into the picture in steps from the controls, and each video has an Info button that gathers play, favorite, move and remove in one place.',
   '0.1.16': 'Videe now speaks Japanese: every screen, menu, dialog, message, the tour and the quick guide are in Japanese by default, and English is one switch away in Settings → Display → Language.',
   '0.1.15': 'Player controls fade out sooner and as soon as the cursor leaves the player or the window.',

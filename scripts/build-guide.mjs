@@ -34,7 +34,7 @@ const browser = await chromium.launch();
 let lang = 'ja';
 /** A control's label as the app shows it in the language being captured. */
 const L = (text, vars) => translate(text, vars, lang);
-async function newPage(os, { width = 1280, height = 800, desktop = false, prefs = { theme: 'light', layout: 'list', autoplay: false } } = {}) {
+async function newPage(os, { width = 1280, height = 800, desktop = false, prefs = { theme: 'light', layout: 'grid', layoutVersion: 2, autoplay: false } } = {}) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SCALE, colorScheme: 'light', reducedMotion: 'reduce' });
   await page.addInitScript(value => localStorage.setItem('videe-preferences', value), JSON.stringify(prefs));
   if (desktop) await page.addInitScript(platform => {
@@ -111,7 +111,7 @@ await make('Create folder', lang === 'ja' ? '旅行' : 'Travel', names.slice(0, 
 await make('Create playlist', lang === 'ja' ? '週末のおすすめ' : 'Weekend picks', names.slice(2, 4));
 await page.getByLabel(L('Add {name} to favorites', { name: names[names.length - 1] }), { exact: true }).click({ force: true });
 await page.waitForTimeout(800);
-await capture(page, 'library', { nav: '.library-sidebar nav', collections: '.library-sidebar .sidebar-section', search: '.search-box', layout: '.layout-switch', row: '.video-list .video-card >> nth=0' });
+await capture(page, 'library', { nav: '.library-sidebar nav', collections: '.library-sidebar .sidebar-section', search: '.search-box', layout: '.layout-switch', row: '.video-grid .video-card >> nth=0' });
 
 // 3. Player, paused partway with the controls showing.
 await page.getByLabel(L('Play {name}', { name: names[OCEAN] }), { exact: true }).click();
