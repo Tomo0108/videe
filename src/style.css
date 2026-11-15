@@ -1393,3 +1393,5 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .guide-figure.portrait { width: min(100%, 380px); margin-inline: auto; }
 .tour h2 + p { margin-top: 2px; }
 .tour-settings .setting-row { padding: 8px 0; }
+/* Menus near the bottom of the window (or above the mini player) open upward. */
+.file-menu[data-up] .menu-panel, .video-list .file-menu[data-up] .menu-panel { top: auto; bottom: 38px; transform-origin: bottom right; }

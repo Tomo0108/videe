@@ -99,18 +99,27 @@ async function analyze(id) {
 }
 
 // Live playback: ffmpeg transcodes from any position straight into the player as fragmented MP4.
+// Only the most recent stream handed to the renderer may run. Requests for older streams
+// (players that were replaced while seeking, or Chromium retrying a broken stream with a
+// byte range) are refused so they can't kill the stream that is playing now.
+let liveToken = '', liveCounter = 0;
 function stopLive() { if (liveJob) { liveJob.stopped = true; liveJob.child?.kill('SIGKILL'); liveJob = undefined; } }
-async function liveResponse(request, id, start, hardware) {
+async function liveResponse(request, id, start, hardware, token) {
   const entry = registry[id];
   if (!entry) return new Response('Not found', { status: 404 });
-  stopLive();
+  const range = /^bytes=(\d+)-/.exec(request.headers.get('range') || '');
+  if (token !== liveToken || (range && Number(range[1]) > 0)) return new Response('Stream replaced', { status: 410 });
   const input = entry.path;
   await fs.access(input);
   const { liveArgs } = await media();
   const { value } = entry.probe || {};
   const info = value?.info || (await analyze(id)).info;
+  const encoder = hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
+  // A newer seek may have arrived while the file was being checked.
+  if (token !== liveToken || request.signal.aborted) return new Response('Stream replaced', { status: 410 });
+  stopLive();
   const out = new PassThrough({ highWaterMark: 1 << 20 });
-  const job = { id, stopped: false, child: undefined };
+  const job = { id, token, stopped: false, child: undefined };
   liveJob = job;
   const run = encoder => {
     let sent = false;
@@ -125,7 +134,7 @@ async function liveResponse(request, id, start, hardware) {
       out.end();
     });
   };
-  run(hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264');
+  run(encoder);
   const stop = () => { job.stopped = true; job.child?.kill('SIGKILL'); if (liveJob === job) liveJob = undefined; };
   request.signal.addEventListener('abort', stop, { once: true });
   out.on('close', () => request.signal.removeEventListener('abort', stop));
@@ -221,7 +230,7 @@ app.whenReady().then(async () => {
   protocol.handle('videe', async request => {
     const url = new URL(request.url); const id = url.pathname.slice(1); const entry = registry[id];
     if (url.hostname === 'live' && entry) {
-      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0'); } catch { return new Response('File unavailable', { status: 404 }); }
+      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0', `${id}:${url.searchParams.get('n')}`); } catch { return new Response('File unavailable', { status: 404 }); }
     }
     if (url.hostname !== 'media' || !entry) return new Response('Not found', { status: 404 });
     try { return await mediaResponse(request, entry.converted || entry.path); } catch { return new Response('File unavailable', { status: 404 }); }
@@ -264,9 +273,10 @@ app.whenReady().then(async () => {
     const entry = registry[id];
     if (!entry) throw new Error('File not found. Please add it again.');
     await fs.access(entry.path);
-    return `videe://live/${id}?t=${Math.max(0, Number(start) || 0).toFixed(3)}&hw=${hardware ? 1 : 0}&n=${Date.now()}`;
+    const n = `${Date.now()}-${++liveCounter}`; liveToken = `${id}:${n}`;
+    return `videe://live/${id}?t=${Math.max(0, Number(start) || 0).toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
   });
-  register('stop-live', () => stopLive());
+  register('stop-live', () => { liveToken = ''; stopLive(); });
   register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
   register('cancel-conversion', () => { if (processJob) { processJob.cancelled = true; processJob.child?.kill('SIGTERM'); } });
   register('convert-video', async id => {

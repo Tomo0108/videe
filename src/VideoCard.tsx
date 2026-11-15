@@ -24,6 +24,18 @@ function playedLabel(item:MediaItem) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(item.lastPlayed);
 }
 const closeMenu = (element:HTMLElement) => element.closest('details')?.removeAttribute('open');
+/** Opens the menu above its button when there is no room below (bottom rows, under the mini player). */
+const placeMenu = (menu:HTMLDetailsElement) => {
+  menu.removeAttribute('data-up');
+  if (!menu.open) return;
+  const panel = menu.querySelector<HTMLElement>('.menu-panel'); const trigger = menu.querySelector('summary');
+  if (!panel || !trigger) return;
+  const mini = document.querySelector('.mini-player')?.getBoundingClientRect();
+  const button = trigger.getBoundingClientRect();
+  const floor = Math.min(window.innerHeight, mini && mini.left < button.right && mini.right > button.left - panel.offsetWidth ? mini.top : Infinity) - 8;
+  const below = floor - button.bottom; const above = button.top - 8;
+  if (panel.offsetHeight + 6 > below && above > below) menu.setAttribute('data-up', '');
+};
 const extension = (name:string) => /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toUpperCase() || '';
 
 /** One library row or card. Memoized so playback progress never re-renders the whole library. */
@@ -48,7 +60,7 @@ export const VideoCard = memo(function VideoCard({item,layout,selected,playing,f
       {layout === 'list' && <><span className="video-duration">{item.duration > 0 ? timeLabel(item.duration) : '—'}</span><span className="video-size">{sizeLabel(item.size)}</span><span className="video-played">{playedLabel(item)}</span></>}
     </button>
     <button type="button" className={`video-favorite${item.favorite ? ' active' : ''}`} aria-pressed={item.favorite} aria-label={item.favorite ? `Unfavorite ${item.name}` : `Add ${item.name} to favorites`} title={item.favorite ? 'Unfavorite' : 'Add to favorites'} onClick={() => actions.current.favorite(item.id)}><Heart size={16} strokeWidth={1.8} fill={item.favorite ? 'currentColor' : 'none'} aria-hidden="true"/></button>
-    <details className="file-menu" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }}>
+    <details className="file-menu" onToggle={event => placeMenu(event.currentTarget)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) event.currentTarget.open = false; }}>
       <summary aria-label={`Options for ${item.name}`} title="More"><Ellipsis size={18} aria-hidden="true"/></summary>
       <div className="menu-panel">
         {inProgress && <button aria-label={`Resume ${item.name}`} onClick={event => { closeMenu(event.currentTarget); actions.current.open(item, true); }}><Play size={16} aria-hidden="true"/>Resume</button>}

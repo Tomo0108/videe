@@ -180,6 +180,12 @@ export default function App() {
     const updated = {...item,...changes}; const next = itemsRef.current.map(i => i.id === id ? updated : i); itemsRef.current = next; setItems(next);
     if(persist) void saveItem(updated).catch(() => notify('Changes could not be saved and may be lost when you close the app.'));
   }, [notify]);
+  /** The engine chosen for a video, kept across sessions so a fix like smooth playback sticks. */
+  const engineChoice = useCallback((id: string): Engine | undefined => engineOverride.current.get(id) ?? itemsRef.current.find(i => i.id === id)?.engine, []);
+  const rememberEngine = useCallback((id: string, target?: Engine) => {
+    if (target) engineOverride.current.set(id, target); else engineOverride.current.delete(id);
+    if (itemsRef.current.find(i => i.id === id)?.engine !== target) updateItem(id, { engine: target });
+  }, [updateItem]);
   // Thumbnails keep generating in the library and while the player is minimized or paused;
   // only active full-size playback and imports pause them. The playing file is never decoded twice.
   useThumbnails(items,busy||(watching&&playing),updateItem,activeId||'');
@@ -270,7 +276,7 @@ export default function App() {
         if (window.videe.analyzeVideo) { try { info = await withTimeout(window.videe.analyzeVideo(item.id), 9000); } catch { info = null; } }
         if(sequence !== openSequence.current) return;
         analysisRef.current = info; setAnalysis(info);
-        const override = engineOverride.current.get(item.id);
+        const override = engineChoice(item.id);
         const planned = info?.known && !info.converted && prefsRef.current.smooth === 'auto' ? info.plan.mode : 'direct';
         const mode = override === 'direct' ? 'direct' : override === 'live' ? 'transcode' : planned;
         if (mode !== 'direct' && info) {
@@ -314,13 +320,13 @@ export default function App() {
       setSource(src); updateItem(item.id, {lastPlayed: Date.now()});
       loadSubtitles(item, sequence);
     } catch(e) { if(sequence === openSequence.current) { setError(e instanceof Error ? e.message : 'Could not open this video.'); setLoading(false); } }
-  }, [conversion,minimized,notify,saveProgress,updateItem,startLive,loadSubtitles]);
+  }, [conversion,minimized,notify,saveProgress,updateItem,startLive,loadSubtitles,engineChoice]);
   /** Switch the active video between direct decoding and live conversion, keeping the position. */
   const switchEngine = useCallback(async (target: Engine, reason = '') => {
     const id = activeRef.current; const video = videoRef.current;
     if (!id || !window.videe) return;
     const at = pendingSeek.current ?? now(); const play = !!video && !video.paused;
-    engineOverride.current.set(id, target);
+    rememberEngine(id, target);
     if (target === 'live') { if (await startLive(id, at, play) && reason) showOsd(reason); return; }
     try {
       const src = await window.videe.getSource(id);
@@ -328,7 +334,7 @@ export default function App() {
       seekOnLoad.current = at; playAfterLoad.current = play; setError(''); setLoading(true); setSource(`${src}${src.includes('?') ? '&' : '?'}direct=${Date.now()}`);
       if (reason) showOsd(reason);
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not open this video.'); }
-  }, [now, startLive, showOsd, notify]);
+  }, [now, startLive, showOsd, notify, rememberEngine]);
   const importFiles = async (files: File[]) => {
     if(busy || !ready || controlsLocked) return;
     const folderName = sourceFolderName(files);
@@ -637,7 +643,7 @@ export default function App() {
       if (options.destination === 'apply' && result.src) {
         updateItem(id, { size: result.size, position: 0, duration: 0, loopA: undefined, loopB: undefined, thumbnail: undefined, thumbnailVersion: 0 });
         segmentsRef.current = []; setSegments([]); setSelectedSegment(null); past.current = []; future.current = []; setPreviewEdits(false);
-        setAb({ a: null, b: null }); setLooping(false); engineRef.current = 'direct'; liveOffset.current = 0; setEngine('direct'); engineOverride.current.delete(id);
+        setAb({ a: null, b: null }); setLooping(false); engineRef.current = 'direct'; liveOffset.current = 0; setEngine('direct'); rememberEngine(id);
         startFromBeginning.current = true; playAfterLoad.current = false; firstLoad.current = true; filmstripFor.current = ''; setFilmstrip([]);
         const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed);
         setError(''); setSource(result.src); setLoading(true); setPosition(0);
@@ -651,6 +657,13 @@ export default function App() {
     finally { setConversion(null); setJobKind('convert'); }
   };
   useEffect(() => { revealChrome(); return () => window.clearTimeout(chromeHide.current); }, [revealChrome, playing]);
+  // A replaced <video> keeps downloading (and retrying) until it is garbage-collected.
+  // Detach its source so a live stream from an earlier seek stops right away.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!source || !video) return;
+    return () => { video.pause(); video.removeAttribute('src'); video.load(); };
+  }, [source]);
   useEffect(() => () => { window.clearTimeout(videoClick.current); window.clearTimeout(liveSeekTimer.current); window.clearTimeout(osdTimer.current); }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -711,7 +724,7 @@ export default function App() {
   }, [activeId, duration, position, prefs.speed]);
   // Stutter watch: when direct decoding drops frames, switch to live conversion (VLC-style frame pacing).
   useEffect(() => {
-    if (!playing || engine !== 'direct' || !active?.native || !window.videe?.liveSource || prefs.smooth !== 'auto' || minimized || engineOverride.current.get(active.id) === 'direct') return;
+    if (!playing || engine !== 'direct' || !active?.native || !window.videe?.liveSource || prefs.smooth !== 'auto' || minimized || engineChoice(active.id) === 'direct') return;
     const video = videoRef.current; if (!video?.getVideoPlaybackQuality) return;
     let last = video.getVideoPlaybackQuality(); let strikes = 0; let warm = 0;
     const timer = window.setInterval(() => {
@@ -737,6 +750,7 @@ export default function App() {
     const probed = analysisRef.current?.info.duration || 0;
     const finiteDuration = live ? (probed || durationRef.current) : (Number.isFinite(video.duration) ? video.duration : 0);
     setDuration(finiteDuration); durationRef.current = finiteDuration; video.playbackRate = prefs.speed; video.volume = prefs.volume; setLoading(false);
+    if (live) recoveries.current = 0;
     if (finiteDuration) updateItem(activeId,{duration:finiteDuration});
     const stored = itemsRef.current.find(i=>i.id===activeId);
     if (first) {
@@ -770,8 +784,8 @@ export default function App() {
     const item = itemsRef.current.find(i => i.id === activeRef.current);
     const at = pendingSeek.current ?? now();
     if (item?.native && window.videe?.liveSource) {
-      if (engineRef.current === 'direct' && !triedLive.current && engineOverride.current.get(item.id) !== 'direct') { triedLive.current = true; void switchEngine('live', 'Converting video for playback'); return; }
-      if (engineRef.current === 'live' && recoveries.current < 2) { recoveries.current++; void startLive(item.id, at, true); return; }
+      if (engineRef.current === 'direct' && !triedLive.current && engineChoice(item.id) !== 'direct') { triedLive.current = true; void switchEngine('live', 'Converting video for playback'); return; }
+      if (engineRef.current === 'live' && recoveries.current < 2) { recoveries.current++; void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return; }
     }
     setLoading(false); setPlaying(false); setError('This video format is not supported by this player.');
   };
@@ -832,7 +846,7 @@ export default function App() {
     try {
       const src = fast ? (await window.videe.prepareVideo(id)).src : await window.videe.convertVideo(id);
       if (activeRef.current !== id) return;
-      engineOverride.current.delete(id); engineRef.current = 'direct'; liveOffset.current = 0; setEngine('direct');
+      rememberEngine(id); engineRef.current = 'direct'; liveOffset.current = 0; setEngine('direct');
       const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed);
       seekOnLoad.current = at; playAfterLoad.current = play; setError(''); setSource(src); setLoading(true);
       notify('Optimized copy ready. Seeking is now instant.');
@@ -842,7 +856,7 @@ export default function App() {
   const removeOptimized = async () => {
     if (!active?.native || !window.videe?.useOriginal) return;
     const id = active.id;
-    try { await window.videe.useOriginal(id); engineOverride.current.delete(id); const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed); await switchEngine(refreshed?.plan.mode === 'direct' ? 'direct' : 'live'); engineOverride.current.delete(id); }
+    try { await window.videe.useOriginal(id); rememberEngine(id); const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed); await switchEngine(refreshed?.plan.mode === 'direct' ? 'direct' : 'live'); rememberEngine(id); }
     catch (e) { notify(e instanceof Error ? e.message : 'Could not remove the optimized copy.'); }
   };
   const removeFromLibrary = async (ids: string[]) => {

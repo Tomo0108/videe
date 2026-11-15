@@ -21,6 +21,10 @@ try {
   await page.waitForFunction(()=>document.querySelector('video')?.paused);
   await page.getByRole('slider',{name:'Playback position',exact:true}).fill('6');
   await page.waitForFunction(()=>{const v=document.querySelector('video');const s=document.querySelector('.seek-play');return v&&v.currentSrc.includes('t=6')&&v.readyState>=2&&Math.abs(Number(s.value)-6)<0.3;},null,{timeout:20000});
+  // Scrubbing quickly restarts the live stream many times without a playback error.
+  for (const [i, t] of [2, 9, 4, 11, 1, 7, 3, 10, 5].entries()) { await page.getByRole('slider',{name:'Playback position',exact:true}).fill(String(t)); await page.waitForTimeout(i % 2 ? 60 : 220); }
+  await page.waitForFunction(()=>{const v=document.querySelector('.player-view video');return v&&v.currentSrc.includes('t=5')&&!v.error&&v.readyState>=2;},null,{timeout:20000});
+  assert.equal(await page.getByText('Can’t play',{exact:false}).count(), 0);
   // Playback details offer a seekable optimized copy.
   await page.getByRole('button',{name:'Playback details',exact:true}).first().click();
   await page.getByText('Smooth playback',{exact:false}).first().waitFor();
