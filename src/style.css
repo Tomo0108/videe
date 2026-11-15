@@ -1395,3 +1395,15 @@ button.setting-row { width: 100%; text-align: left; padding: 10px 0; background:
 .tour-settings .setting-row { padding: 8px 0; }
 /* Menus near the bottom of the window (or above the mini player) open upward. */
 .file-menu[data-up] .menu-panel, .video-list .file-menu[data-up] .menu-panel { top: auto; bottom: 38px; transform-origin: bottom right; }
+
+/* Video info: the name reads as a heading; each row is one line, label left and value right. */
+.info-name { margin: 6px 0 4px; font-size: var(--type-title3); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.video-info-list { margin-top: 12px; }
+.video-info-list > div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); align-items: baseline; gap: 16px; padding: 11px 0; }
+.video-info-list dt { white-space: nowrap; }
+.video-info-list dd { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right; font-variant-numeric: tabular-nums; }
+.video-info-list > div:first-child { border-top: none; }
+/* Long collection names stay on one line in the Collection menu. */
+.choice-options { width: max-content; min-width: 220px; max-width: min(360px, calc(100vw - 40px)); }
+.choice-options button span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+.choice-options button svg { flex: none; }

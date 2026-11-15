@@ -36,13 +36,11 @@ const placeMenu = (menu:HTMLDetailsElement) => {
   const below = floor - button.bottom; const above = button.top - 8;
   if (panel.offsetHeight + 6 > below && above > below) menu.setAttribute('data-up', '');
 };
-const extension = (name:string) => /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toUpperCase() || '';
+export const extension = (name:string) => /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toUpperCase() || '';
 
 /** One library row or card. Memoized so playback progress never re-renders the whole library. */
 export const VideoCard = memo(function VideoCard({item,layout,selected,playing,folderName,folders,actions}:{item:MediaItem;layout:'grid'|'list';selected:boolean;playing:boolean;folderName:string;folders:Collection[];actions:MutableRefObject<CardActions>}) {
   const inProgress = item.position > 0 && item.position < item.duration - 2;
-  const watched = item.duration > 0 && item.lastPlayed > 0 && !inProgress;
-  const ext = extension(item.originalName || item.name);
   // Touch: a long press on a row starts selection, like Photos and Files.
   const pressTimer = useRef(0); const longPressed = useRef(false);
   const cancelPress = () => { window.clearTimeout(pressTimer.current); pressTimer.current = 0; };
@@ -53,10 +51,7 @@ export const VideoCard = memo(function VideoCard({item,layout,selected,playing,f
     <label className="video-select"><input type="checkbox" aria-label={`Select ${item.name}`} checked={selected} onChange={event => actions.current.select(item.id, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey === true)} onClick={event => { if (event.shiftKey) { event.preventDefault(); actions.current.select(item.id, !selected, true); } }}/><Check size={14} strokeWidth={2.4} aria-hidden="true"/></label>
     <button className="video-open" onClick={() => actions.current.open(item)} aria-label={`Play ${item.name}`}>
       <span className="video-preview"><span className={`video-thumbnail${item.thumbnail ? '' : ' pending'}`}>{item.thumbnail ? <img src={item.thumbnail} alt="" loading="lazy" decoding="async" draggable={false}/> : <Film size={24} strokeWidth={1.3} aria-hidden="true"/>}<span className="thumbnail-play" aria-hidden="true"><Play size={23} fill="currentColor"/></span>{layout !== 'list' && item.duration > 0 && <span className="duration-label">{timeLabel(item.duration)}</span>}{item.position > 0 && item.duration > 0 && <span className="card-progress" style={{width:`${Math.min(100, item.position / item.duration * 100)}%`}}/>}</span></span>
-      <span className="video-text"><span className="video-title" title={item.name}>{playing && <AudioLines size={14} className="now-playing" aria-label="Now playing"/>}{item.name.replace(/\.[^.]+$/, '')}</span>
-      {layout === 'list'
-        ? <span className="video-subline">{item.duration > 0 && <span className="subline-duration">{timeLabel(item.duration)}</span>}<span className="subline-size">{sizeLabel(item.size)}</span>{folderName && <span className="video-folder"><Folder size={12} aria-hidden="true"/>{folderName}</span>}{ext && <span className="video-format">{ext}</span>}{inProgress ? <span className="video-state resume">{timeLabel(item.duration - item.position)} left</span> : watched ? <span className="video-state">Watched</span> : null}</span>
-        : <span className="video-meta">{item.favorite && <Heart size={12} fill="currentColor" aria-hidden="true"/>}<span>{item.duration > 0 ? timeLabel(item.duration) : '—'}</span><span>{sizeLabel(item.size)}</span>{inProgress && <span>{timeLabel(item.duration - item.position)} left</span>}{folderName && <span className="video-folder"><Folder size={12} aria-hidden="true"/>{folderName}</span>}</span>}</span>
+      <span className="video-text"><span className="video-title" title={item.name}>{playing && <AudioLines size={14} className="now-playing" aria-label="Now playing"/>}{item.name.replace(/\.[^.]+$/, '')}</span></span>
       {layout === 'list' && <><span className="video-duration">{item.duration > 0 ? timeLabel(item.duration) : '—'}</span><span className="video-size">{sizeLabel(item.size)}</span><span className="video-played">{playedLabel(item)}</span></>}
     </button>
     <button type="button" className={`video-favorite${item.favorite ? ' active' : ''}`} aria-pressed={item.favorite} aria-label={item.favorite ? `Unfavorite ${item.name}` : `Add ${item.name} to favorites`} title={item.favorite ? 'Unfavorite' : 'Add to favorites'} onClick={() => actions.current.favorite(item.id)}><Heart size={16} strokeWidth={1.8} fill={item.favorite ? 'currentColor' : 'none'} aria-hidden="true"/></button>

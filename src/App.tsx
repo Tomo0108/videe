@@ -19,7 +19,7 @@ import {useThumbnails} from './thumbnails';
 import { compareMedia, DEFAULT_DIR, nextSortPref, readFolderSort, sortKey, writeFolderSort, type LibrarySort } from './library-sort.mjs';
 import { EditorPanel, ExportDialog, newSegmentId, type Segment } from './Editor';
 import { Sidebar, type View } from './Sidebar';
-import { VideoCard, FolderCard, type CardActions } from './VideoCard';
+import { VideoCard, FolderCard, extension, type CardActions } from './VideoCard';
 import type { Analysis, ExportOptions } from './env';
 import { QuickGuide, currentEdition, isGuideShortcut } from './QuickGuide';
 import { ProductTour } from './ProductTour';
@@ -1190,7 +1190,26 @@ export default function App() {
         <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setCreating(null)}>Cancel</button><button type="submit" className="primary-button" disabled={!newName.trim()}>Create</button></div>
       </form>
     </Modal>}
-    {info && <Modal title="Video info" onClose={()=>setInfoId(null)}><p className="delete-filename">{info.name}</p><dl className="info-list"><div><dt>Size</dt><dd>{sizeLabel(info.size)}</dd></div><div><dt>Duration</dt><dd>{info.duration?timeLabel(info.duration):'—'}</dd></div><div><dt>Position</dt><dd>{timeLabel(info.position)}</dd></div><div><dt>Added</dt><dd>{new Intl.DateTimeFormat(undefined,{dateStyle:'medium'}).format(info.added)}</dd></div>{folderOf.get(info.id) && <div><dt>Folder</dt><dd>{folderOf.get(info.id)}</dd></div>}<div><dt>Location</dt><dd>{info.native?'File':'Library'}</dd></div></dl>{info.native && window.videe?.revealVideo && <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => void window.videe?.revealVideo(info.id)}><FolderOpen size={15} aria-hidden="true"/>Show in folder</button></div>}</Modal>}
+    {info && (() => {
+      const progress = info.position > 0 && info.duration > 0 && info.position < info.duration - 2 ? `${timeLabel(info.position)} / ${timeLabel(info.duration)} · ${timeLabel(info.duration - info.position)} left` : info.lastPlayed > 0 ? 'Watched' : 'Not started';
+      const date = (time: number) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(time);
+      const rows: [string, string][] = [
+        ['Duration', info.duration ? timeLabel(info.duration) : '—'],
+        ['Size', sizeLabel(info.size)],
+        ['Format', extension(info.originalName || info.name) || '—'],
+        ['Progress', progress],
+        ['Last played', info.lastPlayed ? date(info.lastPlayed) : '—'],
+        ['Added', date(info.added)],
+        ...(folderOf.get(info.id) ? [['Folder', folderOf.get(info.id)!] as [string, string]] : []),
+        ['Favorite', info.favorite ? 'Yes' : 'No'],
+        ['Location', info.native ? 'File on this computer' : 'Library'],
+      ];
+      return <Modal title="Video info" onClose={()=>setInfoId(null)}>
+        <p className="info-name" title={info.name}>{info.name}</p>
+        <dl className="info-list video-info-list">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl>
+        {info.native && window.videe?.revealVideo && <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => void window.videe?.revealVideo(info.id)}><FolderOpen size={15} aria-hidden="true"/>Show in folder</button></div>}
+      </Modal>;
+    })()}
     {deleteIds && deleteIds.length > 0 && <Modal title="Remove from library" onClose={() => setDeleteIds(null)}><p className="delete-filename">{deleteIds.length === 1 ? (items.find(item => item.id === deleteIds[0])?.name || 'This video') : `${deleteIds.length} videos`}</p><p className="subtle-text">{deleteIds.length === 1 ? 'The original file stays.' : 'Original files stay.'}</p><div className="modal-actions"><button className="secondary-button" onClick={() => setDeleteIds(null)}>Cancel</button><button className="danger-button" onClick={() => void confirmDelete()}>Remove</button></div></Modal>}
   </div>;
 }
