@@ -100,6 +100,8 @@ export default function App() {
   const [selectedSegment,setSelectedSegment] = useState<string|null>(null); const selectedSegmentRef = useRef(selectedSegment); selectedSegmentRef.current = selectedSegment;
   const past = useRef<Segment[][]>([]); const future = useRef<Segment[][]>([]); const dragBase = useRef<Segment[]|null>(null); const [, setHistoryTick] = useState(0);
   const [previewEdits,setPreviewEdits] = useState(false); const [snap,setSnap] = useState(true); const stopAt = useRef<number|null>(null);
+  /** Which open button started the current import, so only that one shows a spinner. */
+  const [busySource,setBusySource] = useState<'files'|'folder'|null>(null);
   const [creating,setCreating] = useState<'folder'|'playlist'|null>(null); const [newName,setNewName] = useState('');
   const [foldersOpen,setFoldersOpen] = useState(() => { try { return localStorage.getItem('videe-folders-open') !== 'false'; } catch { return true; } });
   const videoRef = useRef<HTMLVideoElement>(null); const stageRef = useRef<HTMLDivElement>(null); const fileRef = useRef<HTMLInputElement>(null); const folderRef = useRef<HTMLInputElement>(null); const subtitleRef = useRef<HTMLInputElement>(null); const activeRef = useRef(activeId); activeRef.current = activeId;
@@ -335,8 +337,9 @@ export default function App() {
       if (reason) showOsd(reason);
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not open this video.'); }
   }, [now, startLive, showOsd, notify, rememberEngine]);
-  const importFiles = async (files: File[]) => {
+  const importFiles = async (files: File[], source: 'files'|'folder'|null = null) => {
     if(busy || !ready || controlsLocked) return;
+    setBusySource(source);
     const folderName = sourceFolderName(files);
     const groups = sourceFolderGroups(files);
     const idsFor = (fileList: File[], records: {id:string;name:string;size:number}[]) => fileList.map(file => records.find(record => record.name === file.name && record.size === file.size)?.id).filter((id): id is string => !!id);
@@ -440,7 +443,7 @@ export default function App() {
   const pickFolder = async () => {
     if(busy || !ready || controlsLocked) return;
     if(window.videe) {
-      setBusy(true);
+      setBusy(true); setBusySource('folder');
       try {
         const picked = await window.videe.pickFolder();
         if(picked === null) return;
@@ -455,7 +458,7 @@ export default function App() {
   const pickFiles = async () => {
     if(busy || !ready || controlsLocked) return;
     if(window.videe) {
-      setBusy(true);
+      setBusy(true); setBusySource('files');
       try {
         const picked = await window.videe.pickFiles();
         if(picked === null) return;
@@ -1008,15 +1011,15 @@ export default function App() {
     onDragLeave={e => { e.preventDefault(); if(--dragDepth.current <= 0) { dragDepth.current=0; setDragging(false); } }}
     onDrop={e => { e.preventDefault(); dragDepth.current=0; setDragging(false); if (e.dataTransfer.files.length) void importFiles(Array.from(e.dataTransfer.files)); }}>
     <a className="skip-link" href="#main">Skip to content</a>
-    <input ref={fileRef} className="file-input" type="file" accept="video/*,.mkv,.avi,.divx,.wmv,.asf,.flv,.f4v,.mpeg,.mpg,.m2ts,.mts,.ts,.3gp,.3g2,.ogv,.vob,.mxf,.dv,.hevc,.av1,.rm,.rmvb" multiple hidden onChange={e => { void importFiles(Array.from(e.target.files || [])); e.target.value=''; }}/>
-    <input ref={bindFolderInput} className="folder-input" type="file" multiple hidden onChange={e => { const files = Array.from(e.target.files || []); e.target.value=''; if(!files.length) { notify('No videos in this folder.'); return; } void importFiles(files); }}/>
+    <input ref={fileRef} className="file-input" type="file" accept="video/*,.mkv,.avi,.divx,.wmv,.asf,.flv,.f4v,.mpeg,.mpg,.m2ts,.mts,.ts,.3gp,.3g2,.ogv,.vob,.mxf,.dv,.hevc,.av1,.rm,.rmvb" multiple hidden onChange={e => { void importFiles(Array.from(e.target.files || []), 'files'); e.target.value=''; }}/>
+    <input ref={bindFolderInput} className="folder-input" type="file" multiple hidden onChange={e => { const files = Array.from(e.target.files || []); e.target.value=''; if(!files.length) { notify('No videos in this folder.'); return; } void importFiles(files, 'folder'); }}/>
     <input ref={subtitleRef} type="file" accept=".srt,.vtt" hidden onChange={e => { void importSubtitle(e.target.files?.[0]); e.target.value=''; }}/>
 
     <header className="app-header" inert={controlsLocked}>
       {watching ? <div className="player-heading"><IconButton icon={ArrowLeft} label="Back to library" onClick={() => void minimizePlayer()}/><h1 title={active.name}>{active.name}</h1>{engineLabel && <button type="button" className={`engine-badge ${engine}`} onClick={() => setModal('playback')} title="Playback details"><Zap size={13} aria-hidden="true"/>{engineLabel}</button>}</div>
         : <div className="brand"><img src="./icon.png" width="30" height="30" alt=""/><span>Videe</span></div>}
       <div className="header-actions">
-        {!watching && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy || !ready ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
+        {!watching && <><button className="icon-button header-open-video" aria-label="Open video" title="Open video" disabled={busy || !ready} onClick={() => void pickFiles()}>{busy && busySource === 'files' ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <Upload size={18} strokeWidth={1.8} aria-hidden="true"/>}</button><button className="icon-button header-open" aria-label="Open folder" title="Open folder" disabled={busy || !ready} onClick={() => void pickFolder()}>{busy && busySource === 'folder' ? <Loader2 size={18} className="spin" aria-hidden="true"/> : <FolderOpen size={18} strokeWidth={1.8} aria-hidden="true"/>}</button></>}
         {watching && <IconButton icon={Scissors} label={editing ? 'Close editor' : 'Edit video'} active={editing} disabled={!duration || !!error} onClick={toggleEditor}/>}
         {!watching && <IconButton icon={CircleHelp} label="Quick guide" className="header-help" onClick={() => setModal('guide')}/>}
         <IconButton icon={Settings2} label="Settings" onClick={() => setModal('settings')}/>
