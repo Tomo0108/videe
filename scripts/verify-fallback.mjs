@@ -21,9 +21,15 @@ try {
   assert.equal(await page.locator('.cut-progress').count(), 0, 'no preparing step');
   assert.ok(!(await page.locator('body').innerText()).includes('最適化'), 'no 最適化 wording');
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });
+  // Opening a file that is already in the library again (after closing the player) plays it too.
+  await page.getByRole('button', { name: 'ライブラリに戻る', exact: true }).click();
+  await page.getByRole('button', { name: 'プレイヤーを閉じる', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('.player-view'));
+  await page.locator('.header-open-video').click();
+  await page.waitForFunction(() => { const v = document.querySelector('.player-view video'); return v && v.currentSrc.startsWith('videe://live/') && !v.error && v.readyState >= 2 && v.currentTime > 0.5; }, null, { timeout: 30000 });
   assert.deepEqual(await readdir(join(userData, 'converted')).catch(() => []), [], 'nothing written to disk');
   assert.deepEqual(errors, []);
-  console.log('PASS: MKV/AC-3 plays at once through live conversion with no preparing step and nothing on disk.');
+  console.log('PASS: MKV/AC-3 plays at once through live conversion (also when opened again) with no preparing step and nothing on disk.');
 } finally {
   await app.close();
   await rm(userData, { recursive: true, force: true });

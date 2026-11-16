@@ -269,7 +269,9 @@ export default function App() {
     }
     try {
       const src = await window.videe.liveSource(id, at, prefsRef.current.hardware);
-      if (sequence !== openSequence.current || activeRef.current !== id) return false;
+      if (sequence !== openSequence.current) return false;
+      // Another video became active meanwhile: drop this stream without leaving a spinner behind.
+      if (activeRef.current !== id) { setLoading(false); return false; }
       liveOffset.current = at; engineRef.current = 'live'; setEngine('live');
       pendingSeek.current = null; playAfterLoad.current = play; setError(''); setLoading(true); setPosition(at); lastPositionPaint.current = at;
       setSource(src);
@@ -304,7 +306,7 @@ export default function App() {
     window.clearTimeout(liveSeekTimer.current); pendingSeek.current = null; seekOnLoad.current = null; firstLoad.current = true; recoveries.current = 0; triedLive.current = false; stopAt.current = null;
     engineRef.current = 'direct'; liveOffset.current = 0; analysisRef.current = null;
     setEngine('direct'); setAnalysis(null); setFrameStats(null); setFilmstrip([]); filmstripFor.current = ''; setSegments([]); setSelectedSegment(null); past.current = []; future.current = []; setPreviewEdits(false);
-    setAb({a:null,b:null}); setLooping(false); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); setVideoZoom(1); setVideoPan({x:0,y:0}); lastSave.current = 0; lastPositionPaint.current = 0;
+    setAb({a:null,b:null}); setLooping(false); activeRef.current = item.id; setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); setVideoZoom(1); setVideoPan({x:0,y:0}); lastSave.current = 0; lastPositionPaint.current = 0;
     try {
       let src: string;
       if(item.native && window.videe) {
