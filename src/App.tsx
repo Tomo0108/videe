@@ -809,12 +809,12 @@ export default function App() {
   useEffect(() => {
     const bridge = window.videe?.mpv;
     if (engine !== 'mpv' || !bridge) return;
-    let frame = 0; let last = ''; let lastShot = 0;
+    let frame = 0; let last = ''; let barShown = false;
     const visible = (el: Element | null) => { if (!el) return null; const style = getComputedStyle(el); if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) < 0.05) return null; const r = el.getBoundingClientRect(); return r.width && r.height ? r : null; };
     const measure = () => {
       frame = requestAnimationFrame(measure);
       const surface = mpvSurface.current;
-      type Box = { x: number; y: number; width: number; height: number; radius?: number };
+      type Box = { x: number; y: number; width: number; height: number; radius?: number; bar?: boolean };
       let rect: (Box & { holes: Box[] }) | null = null;
       if (surface && !mpvBlocked2 && !document.querySelector('dialog[open]')) {
         // The video window keeps the surface's full size, so showing the controls never resizes the
@@ -830,16 +830,19 @@ export default function App() {
           const o = visible(el);
           if (!o || o.right <= left || o.left >= right || o.bottom <= top || o.top >= bottom) continue;
           const x = Math.max(left, o.left), y = Math.max(top, o.top);
-          holes.push({ x: x - left, y: y - top, width: Math.min(right, o.right) - x, height: Math.min(bottom, o.bottom) - y, radius: parseFloat(getComputedStyle(el!).borderTopLeftRadius) || 0 });
+          holes.push({ x: x - left, y: y - top, width: Math.min(right, o.right) - x, height: Math.min(bottom, o.bottom) - y, radius: parseFloat(getComputedStyle(el!).borderTopLeftRadius) || 0, bar: !el!.classList.contains('app-header') });
         }
         if (bottom - top > 8 && right - left > 8) rect = { x: left, y: top, width: right - left, height: bottom - top, holes };
       }
       const key = rect ? [rect, ...rect.holes].map(b => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)},${Math.round(b.height)},${Math.round(b.radius || 0)}`).join(';') : 'hidden';
       // While a bar is cut out of the video, keep a recent frame behind it for its frosted glass.
-      if (surface && rect?.holes.length && performance.now() - lastShot > 1000) {
-        lastShot = performance.now();
+      // One frame each time the control bar appears is enough under its blur. Grabbing frames
+      // continuously made mpv's picture stutter and tear on Windows.
+      const bar = !!rect?.holes.some(h => h.bar);
+      if (surface && bar && !barShown) {
         void bridge.snapshot().then(url => { if (url && mpvSurface.current === surface) surface.style.backgroundImage = `url("${url}")`; }).catch(() => {});
       }
+      barShown = bar;
       if (key !== last) { last = key; void bridge.place(rect).catch(() => {}); }
     };
     measure();
