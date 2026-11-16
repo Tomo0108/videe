@@ -195,8 +195,11 @@ class MpvEngine {
     this.send({ type: 'loaded', duration: Number(duration) || 0, width: Number(width) || 0, height: Number(height) || 0 });
   }
 
-  async open(file, { volume = 1, speed = 1, muted = false } = {}) {
+  async open(file, { volume = 1, speed = 1, muted = false, interlaced = false } = {}) {
     await this.raw(['set_property', 'pause', true]);
+    // Known interlaced files are always deinterlaced. Otherwise "auto" deinterlaces only frames flagged
+    // as interlaced (newer mpv); older builds that lack it fall back to off.
+    await this.raw(['set_property', 'deinterlace', interlaced ? 'yes' : 'auto']).catch(() => this.raw(['set_property', 'deinterlace', interlaced ? 'yes' : 'no']).catch(() => {}));
     await this.raw(['set_property', 'volume', Math.round(Math.max(0, Math.min(1, Number(volume) || 0)) * 100)]);
     await this.raw(['set_property', 'speed', Number(speed) || 1]);
     await this.raw(['set_property', 'mute', !!muted]);

@@ -371,7 +371,9 @@ app.whenReady().then(async () => {
     await fs.access(input);
     stopLive();
     const engine = await mpvEngine();
-    await engine.open(input, options && typeof options === 'object' ? options : {});
+    // Interlaced recordings (TV, camcorders) flicker and comb unless they're deinterlaced, as live conversion does.
+    const interlaced = input === entry.path && !!entry.probe?.value?.info?.video?.interlaced;
+    await engine.open(input, { ...(options && typeof options === 'object' ? options : {}), interlaced });
   });
   register('mpv-set', async (name, value) => { if (mpv) await mpv.set(String(name), value); });
   register('mpv-command', async (name, args) => { if (mpv) return mpv.command(String(name), args); });
