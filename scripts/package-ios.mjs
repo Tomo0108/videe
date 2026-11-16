@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { artifactNames } from '../src/release.mjs';
+import { RELEASE_VERSION, artifactNames, iosBuildNumber } from '../src/release.mjs';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: 'inherit', ...options });
@@ -39,6 +39,9 @@ run('xcodebuild', [
   'CODE_SIGNING_REQUIRED=NO',
   'CODE_SIGNING_ALLOWED=NO',
   'DEVELOPMENT_TEAM=',
+  // AltStore refuses an IPA whose version differs from the one its source lists.
+  `MARKETING_VERSION=${RELEASE_VERSION}`,
+  `CURRENT_PROJECT_VERSION=${iosBuildNumber()}`,
   'build'
 ]);
 const appPath = findApp(join(derived, 'Build', 'Products'));

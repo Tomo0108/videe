@@ -1,10 +1,32 @@
-import { RELEASE_REPO } from './release.mjs';
+import { RELEASE_REPO, iosBuildNumber } from './release.mjs';
 
 export const SITE_ORIGIN = 'https://videe-zeta.vercel.app';
 export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
+// The source targets AltStore Classic: downloadURL points straight at the .ipa (AltStore PAL would need a
+// notarized ADP and a marketplaceID instead).
+// AltStore checks every install against the source: the IPA's version must match, and its permissions must
+// match appPermissions exactly. Keep IOS_PRIVACY in step with the UsageDescription keys in ios/App/App/Info.plist.
+export const IOS_PRIVACY = {
+  NSPhotoLibraryUsageDescription: '選んだ動画を Videe で開くために、写真ライブラリにアクセスします。',
+  NSDocumentsFolderUsageDescription: 'このデバイスに保存された動画ファイルを Videe で開くために使います。',
+};
+// IPAs before 0.1.23 were all built with the version 0.1.5 inside, so AltStore would reject them.
+export const FIRST_ALTSTORE_VERSION = '0.1.23';
+
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff) return Math.sign(diff);
+  }
+  return 0;
+}
+
 const NOTES = {
+  '0.1.23': 'Installs again from AltStore Classic: the iOS app now carries its real version number, and the AltStore source lists the photo and file permissions it uses.',
   '0.1.22': 'Release pages now include an illustrated quick guide for Mac, Windows, and iPhone / iPad, and the in-app guide has an iPhone / iPad edition.',
   '0.1.21': 'The empty library is now just the two buttons for choosing videos or a folder.',
   '0.1.20': 'Flatter buttons and icons with no glows or blurred backdrops, and a simpler empty library.',
@@ -66,8 +88,9 @@ export function altstoreSource({ sourceURL = ALTSTORE_JSON, iconURL = `${SITE_OR
       iconURL,
       tintColor: '1F5FD0',
       category: 'entertainment',
-      appPermissions: {},
+      appPermissions: { entitlements: [], privacy: { ...IOS_PRIVACY } },
       version: latest.version,
+      ...(latest.buildVersion ? { buildVersion: latest.buildVersion } : {}),
       versionDate: latest.date,
       versionDescription: latest.localizedDescription,
       downloadURL: latest.downloadURL,
@@ -82,9 +105,11 @@ export function versionsFromReleases(releases) {
     const version = String(release.tag_name || '').replace(/^v/, '');
     const ipa = (release.assets || []).find(asset => /\.ipa$/i.test(asset.name));
     if (!version || !ipa?.browser_download_url || !ipa.size) return [];
+    if (release.draft || release.prerelease || compareVersions(version, FIRST_ALTSTORE_VERSION) < 0) return [];
     const sha = String(ipa.digest || '').replace(/^sha256:/, '');
     return [{
       version,
+      buildVersion: iosBuildNumber(version),
       date: release.published_at || new Date().toISOString(),
       localizedDescription: versionNote(version, release.name || ''),
       downloadURL: ipa.browser_download_url,
@@ -92,5 +117,5 @@ export function versionsFromReleases(releases) {
       minOSVersion: '15.0',
       ...(sha ? { sha256: sha } : {}),
     }];
-  });
+  }).sort((a, b) => compareVersions(b.version, a.version));
 }
