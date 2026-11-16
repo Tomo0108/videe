@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.27': 'On Windows, video playing with the built-in mpv engine no longer flickers.',
   '0.1.26': 'On Windows, the control bar over a video playing with the built-in mpv engine is frosted glass over the picture again, with rounded corners that match.',
   '0.1.25': 'On Windows, full screen with the built-in mpv engine fills the whole screen again, and showing the controls no longer resizes the video.',
   '0.1.24': 'On Windows, MKV, AVI and other formats play right away with a built-in mpv engine, with no conversion and nothing written to disk. On Mac they play through live conversion with no preparing step.',

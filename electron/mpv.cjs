@@ -45,9 +45,11 @@ class ChildWindow {
     this.combineRegion = gdi32.func('CombineRgn', 'int', ['intptr_t', 'intptr_t', 'intptr_t', 'int']);
     this.deleteObject = gdi32.func('DeleteObject', 'bool', ['intptr_t']);
     this.regionKey = '';
-    // WS_CHILD | WS_CLIPSIBLINGS | SS_BLACKRECT. A STATIC control without SS_NOTIFY lets mouse
-    // input fall through to the page underneath, so clicks and the cursor keep working.
-    this.hwnd = this.create(0, 'STATIC', '', 0x40000000 | 0x04000000 | 0x4, 0, 0, 1, 1, parentHandle, 0, 0, 0);
+    // WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | SS_BLACKRECT. A STATIC control without SS_NOTIFY
+    // lets mouse input fall through to the page underneath, so clicks and the cursor keep working.
+    // WS_CLIPCHILDREN keeps its black fill off mpv's own window inside it; without it every repaint
+    // (moving, resizing, cutting out the controls) blacked out the picture for a moment.
+    this.hwnd = this.create(0, 'STATIC', '', 0x40000000 | 0x04000000 | 0x02000000 | 0x4, 0, 0, 1, 1, parentHandle, 0, 0, 0);
     if (!this.hwnd) throw new Error('Could not create the video window.');
     this.visible = false;
   }

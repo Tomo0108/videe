@@ -836,7 +836,7 @@ export default function App() {
       }
       const key = rect ? [rect, ...rect.holes].map(b => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)},${Math.round(b.height)},${Math.round(b.radius || 0)}`).join(';') : 'hidden';
       // While a bar is cut out of the video, keep a recent frame behind it for its frosted glass.
-      if (surface && rect?.holes.length && performance.now() - lastShot > 250) {
+      if (surface && rect?.holes.length && performance.now() - lastShot > 1000) {
         lastShot = performance.now();
         void bridge.snapshot().then(url => { if (url && mpvSurface.current === surface) surface.style.backgroundImage = `url("${url}")`; }).catch(() => {});
       }
