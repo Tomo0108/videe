@@ -1570,8 +1570,8 @@ body { background: var(--base); }
 .header-actions > .icon-button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
 
 /* Buttons: the primary action carries the brand gradient. */
-.primary-button { background: var(--accent-grad); color: #fff; border: 0; box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent-fill) 70%, transparent), inset 0 1px 0 #ffffff33; }
-.primary-button:hover:not(:disabled) { filter: brightness(1.07) saturate(1.05); box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--accent-fill) 80%, transparent), inset 0 1px 0 #ffffff40; }
+.primary-button { background: var(--accent-grad); color: #fff; border: 0; box-shadow: none; }
+.primary-button:hover:not(:disabled) { filter: brightness(1.07) saturate(1.05); box-shadow: none; }
 .secondary-button { background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 2px #0e11160d; }
 .secondary-button:hover:not(:disabled) { background: color-mix(in srgb, var(--surface) 88%, var(--ink) 6%); }
 :root[data-theme=dark] .secondary-button { background: var(--group); box-shadow: none; }
@@ -1598,7 +1598,7 @@ body { background: var(--base); }
 :root[data-theme=dark] .search-box { background: var(--group); }
 @media (prefers-color-scheme: dark) { :root[data-theme=system] .search-box { background: var(--group); } }
 .layout-switch { background: var(--surface); border-color: var(--line); }
-.layout-pill { background: var(--accent-grad); box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--accent-fill) 70%, transparent); }
+.layout-pill { background: var(--accent-grad); box-shadow: none; }
 :root[data-theme=dark] .layout-switch { background: var(--group); }
 @media (prefers-color-scheme: dark) { :root[data-theme=system] .layout-switch { background: var(--group); } }
 
@@ -1629,12 +1629,12 @@ body { background: var(--base); }
   .video-grid:not(.video-list) .video-card:hover .video-thumbnail::after { opacity: .9; }
 }
 .video-grid:not(.video-list) .video-card.selected .video-thumbnail { box-shadow: 0 0 0 3px var(--accent-fill), var(--card-shadow); }
-.thumbnail-play { width: 52px; height: 52px; z-index: 2; color: #fff; background: #ffffff2e; border: 1px solid #ffffff59; box-shadow: 0 10px 30px -6px #000a; backdrop-filter: blur(14px) saturate(1.6); -webkit-backdrop-filter: blur(14px) saturate(1.6); transform: scale(.8); }
+.thumbnail-play { width: 52px; height: 52px; z-index: 2; color: #fff; background: #ffffff2e; border: 1px solid #ffffff59; box-shadow: none; backdrop-filter: blur(14px) saturate(1.6); -webkit-backdrop-filter: blur(14px) saturate(1.6); transform: scale(.8); }
 .thumbnail-play svg { width: 22px; height: 22px; margin-left: 3px; }
 .video-list .thumbnail-play { width: 32px; height: 32px; }
 .video-list .thumbnail-play svg { width: 14px; height: 14px; margin-left: 2px; }
 .duration-label { z-index: 2; right: 8px; bottom: 8px; padding: 1px 7px; border-radius: 6px; font-weight: 600; letter-spacing: .01em; background: #0009; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 0 0 1px #ffffff1a; }
-.card-progress { z-index: 2; height: 4px; background: var(--accent-grad); box-shadow: 0 0 10px color-mix(in srgb, var(--accent-fill) 80%, transparent); }
+.card-progress { z-index: 2; height: 4px; background: var(--accent-grad); box-shadow: none; }
 .video-thumbnail:has(.card-progress)::before { content: ''; position: absolute; inset: auto 0 0 0; height: 4px; z-index: 1; background: #ffffff33; }
 .video-grid:not(.video-list) .video-card .video-favorite { z-index: 4; background: #0007; box-shadow: 0 0 0 1px #ffffff26; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .video-grid:not(.video-list) .video-title { padding-top: 12px; font-size: var(--type-body); font-weight: 550; line-height: 1.35; letter-spacing: -.005em; }
@@ -1663,7 +1663,7 @@ body { background: var(--base); }
 @keyframes videe-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
 :root[data-motion=off] .empty-art { animation: none; }
 @media (prefers-reduced-motion: reduce) { .empty-art { animation: none; } }
-.drop-overlay { background: color-mix(in srgb, var(--base) 70%, transparent); box-shadow: inset 0 0 0 2px var(--accent-fill), 0 0 80px color-mix(in srgb, var(--accent-fill) 25%, transparent) inset; }
+.drop-overlay { background: color-mix(in srgb, var(--base) 70%, transparent); box-shadow: inset 0 0 0 2px var(--accent-fill); }
 
 /* Watching: a dark screening room in every theme. */
 .watching .app-header, .watching main {
@@ -1685,7 +1685,7 @@ body { background: var(--base); }
 .mini-player .player-stage::after { display: none; }
 .player-controls { bottom: 18px; max-width: 1120px; padding: 10px 16px 12px; border-radius: 20px; background: #16181ea6; border: 1px solid #ffffff1c; box-shadow: 0 20px 50px -14px #000c, inset 0 1px 0 #ffffff14; backdrop-filter: blur(26px) saturate(1.7); -webkit-backdrop-filter: blur(26px) saturate(1.7); }
 .player-controls .icon-button { border-radius: 12px; color: #d9dee8; }
-.player-controls .icon-button.transport-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #0b0d12; box-shadow: 0 6px 18px -6px #000c; }
+.player-controls .icon-button.transport-play { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: #0b0d12; box-shadow: none; }
 .player-controls .icon-button.transport-play:hover:not(:disabled) { background: #fff; color: #0b0d12; transform: scale(1.06); }
 .player-controls .icon-button.active { color: #fff; background: color-mix(in srgb, #4d7dff 45%, transparent); }
 .player-controls .time-label { font-weight: 500; }
@@ -1695,10 +1695,10 @@ body { background: var(--base); }
 .seek-bar { height: 22px; }
 .seek-bar .seek-play { background: linear-gradient(to right, #6f97ff 0, #8d7bff var(--progress, 0%), #ffffff2e var(--progress, 0%)); }
 .seek-bar:hover .seek-play { height: 8px; }
-.player-controls input[type=range]::-webkit-slider-thumb { width: 14px; height: 14px; background: #fff; box-shadow: 0 0 0 4px #6f97ff40, 0 2px 6px #0008; transition: transform var(--duration-fast) var(--ease-out); }
+.player-controls input[type=range]::-webkit-slider-thumb { width: 14px; height: 14px; background: #fff; box-shadow: none; transition: transform var(--duration-fast) var(--ease-out); }
 .seek-bar .seek-play::-webkit-slider-thumb { transform: scale(.7); }
 .seek-bar:hover .seek-play::-webkit-slider-thumb, .seek-bar .seek-play:focus-visible::-webkit-slider-thumb { transform: scale(1.1); }
-.player-controls input[type=range]::-moz-range-thumb { width: 14px; height: 14px; box-shadow: 0 0 0 4px #6f97ff40, 0 2px 6px #0008; }
+.player-controls input[type=range]::-moz-range-thumb { width: 14px; height: 14px; box-shadow: none; }
 .seek-hover img { width: 176px; border-radius: 10px; box-shadow: 0 14px 34px -8px #000e, 0 0 0 1px #ffffff33; }
 .seek-hover > span { padding: 3px 8px; border-radius: 8px; font-weight: 600; background: #000d; }
 .player-osd { padding: 8px 16px; font-weight: 600; background: #0b0d12b3; border: 1px solid #ffffff1a; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
@@ -1750,12 +1750,12 @@ input[role=switch]:checked:active::after { transform: translateX(13px); }
 .info-hero-backdrop { position: absolute; inset: -20%; width: 140%; height: 140%; object-fit: cover; filter: blur(28px) saturate(1.4) brightness(.7); z-index: -1; }
 .info-hero > img:not(.info-hero-backdrop) { width: 100%; height: 100%; object-fit: contain; }
 .info-hero-play { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 0; background: linear-gradient(to top, #0008, #0000 55%); color: #fff; }
-.info-hero-play > span { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #ffffff2e; border: 1px solid #ffffff59; backdrop-filter: blur(14px) saturate(1.6); -webkit-backdrop-filter: blur(14px) saturate(1.6); box-shadow: 0 10px 30px -6px #000a; transition: transform .35s var(--ease-spring), background var(--duration-fast) var(--ease-out); }
+.info-hero-play > span { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: #ffffff2e; border: 1px solid #ffffff59; backdrop-filter: blur(14px) saturate(1.6); -webkit-backdrop-filter: blur(14px) saturate(1.6); box-shadow: none; transition: transform .35s var(--ease-spring), background var(--duration-fast) var(--ease-out); }
 .info-hero-play > span svg { margin-left: 3px; }
 .info-hero-play:hover > span { transform: scale(1.08); background: #ffffff40; }
 .info-hero-progress { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent-grad); z-index: 1; }
 .info-hero-time { position: absolute; right: 10px; bottom: 10px; z-index: 1; padding: 2px 8px; border-radius: 7px; background: #0009; color: #fff; font-size: var(--type-caption); font-weight: 600; font-variant-numeric: tabular-nums; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); pointer-events: none; }
-.info-actions .secondary-button:first-child { background: var(--accent-grad); color: #fff; border-color: transparent; box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent-fill) 70%, transparent); }
+.info-actions .secondary-button:first-child { background: var(--accent-grad); color: #fff; border-color: transparent; box-shadow: none; }
 
 /* Toasts and menus: glass. */
 .toast { border-radius: 16px; background: color-mix(in srgb, var(--surface) 82%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); }
@@ -1771,3 +1771,12 @@ input[role=switch]:checked:active::after { transform: translateX(13px); }
   :root[data-motion=on] .video-card:hover .video-thumbnail, :root[data-motion=on] .folder-card:hover .folder-cover { transform: none; }
   :root[data-motion=on] .video-card:hover .video-thumbnail > img { scale: 1; }
 }
+
+/* No glows on icons or buttons (ToMo, 2026-11-16). */
+input[role=switch]:checked { box-shadow: none; }
+.thumbnail-play { box-shadow: none; }
+/* Icons on artwork are solid, without a blurred backdrop. */
+.thumbnail-play, .info-hero-play > span { background: #000000a6; border-color: #ffffff4d; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.video-grid:not(.video-list) .video-card .video-favorite, .video-grid:not(.video-list) .video-select input, .duration-label, .info-hero-time { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.video-grid:not(.video-list) .video-select input, .video-grid:not(.video-list) .video-select:hover input { box-shadow: none; }
+.video-grid:not(.video-list) .video-select input:not(:checked) { background: #00000080; }

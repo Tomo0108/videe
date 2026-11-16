@@ -59,7 +59,6 @@ export const JA = {
   'Grid view': 'サムネイル表示',
   'List view': 'リスト表示',
   'No videos': '動画がありません',
-  'Drop videos anywhere, or choose files to start watching.': '動画をウィンドウにドロップするか、ファイルを選んで再生を始めましょう。',
   'Choose videos': '動画を選ぶ',
   'Choose a folder': 'フォルダーを選ぶ',
   'No videos found': '動画が見つかりません',
