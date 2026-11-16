@@ -60,6 +60,9 @@ class ChildWindow {
     this.setPos(this.hwnd, 0, rect.x, rect.y, Math.max(1, rect.width), Math.max(1, rect.height), 0x10 | 0x200 | 0x40);
     this.visible = true;
     this.cut(rect.holes || []);
+    // Chromium can put its own window back on top (reloads, GPU restarts), which would hide the
+    // video behind the page. Keep raising it while it's shown.
+    if (!this.raiser) this.raiser = setInterval(() => { if (this.visible) this.setPos(this.hwnd, 0, 0, 0, 0, 0, 0x1 | 0x2 | 0x10 | 0x200); }, 500);
   }
   /** Cuts the page's bars (controls, header) out of the window, so they show over the video without resizing it. */
   cut(holes) {
@@ -78,7 +81,7 @@ class ChildWindow {
     // The window owns the region from here on.
     this.setRegion(this.hwnd, region, true);
   }
-  destroy() { try { this.destroyWindow(this.hwnd); } catch { /* Already gone with the window. */ } }
+  destroy() { clearInterval(this.raiser); try { this.destroyWindow(this.hwnd); } catch { /* Already gone with the window. */ } }
 }
 
 class MpvEngine {
