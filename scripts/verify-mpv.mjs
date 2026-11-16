@@ -2,12 +2,13 @@ import { _electron as electron } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import ffmpeg from 'ffmpeg-static';
 // The built-in mpv engine plays files the page can't (MKV with AC-3 here, an old AVI) as they are:
 // no conversion, nothing written to disk, and the player's own controls drive it.
 // Runs on Linux with the system libmpv (VIDEE_MPV=1); on Windows the bundled libmpv is used.
-const userData = await mkdtemp('/tmp/videe-mpv-test-');
+const userData = await mkdtemp(join(tmpdir(), 'videe-mpv-test-'));
 const mkv = join(userData, 'clip.mkv');
 const made = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=640x360:r=25:d=12', '-f', 'lavfi', '-i', 'sine=f=440:d=12', '-c:v', 'libx264', '-g', '125', '-pix_fmt', 'yuv420p', '-c:a', 'ac3', mkv]);
 assert.equal(made.status, 0, String(made.stderr));
