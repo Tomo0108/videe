@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.24': 'On Windows, MKV, AVI and other formats play right away with a built-in mpv engine, with no conversion and nothing written to disk. On Mac they play through live conversion with no preparing step.',
   '0.1.23': 'Installs again from AltStore Classic: the iOS app now carries its real version number, and the AltStore source lists the photo and file permissions it uses.',
   '0.1.22': 'Release pages now include an illustrated quick guide for Mac, Windows, and iPhone / iPad, and the in-app guide has an iPhone / iPad edition.',
   '0.1.21': 'The empty library is now just the two buttons for choosing videos or a folder.',
