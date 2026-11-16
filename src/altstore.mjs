@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.21': 'The empty library is now just the two buttons for choosing videos or a folder.',
   '0.1.20': 'Flatter buttons and icons with no glows or blurred backdrops, and a simpler empty library.',
   '0.1.19': 'Cleaner icons without the glow, and the empty library buttons now read simply "Choose videos" and "Choose a folder".',
   '0.1.18': 'A richer look throughout: poster-style cards that lift on hover, a darkened screening room with a frosted control bar and accent seek bar while watching, a Video info sheet with the artwork up top, a friendlier empty library, deeper light and dark themes, and bottom sheets on phones.',
