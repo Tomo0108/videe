@@ -836,13 +836,14 @@ export default function App() {
       }
       const key = rect ? [rect, ...rect.holes].map(b => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)},${Math.round(b.height)},${Math.round(b.radius || 0)}`).join(';') : 'hidden';
       // While a bar is cut out of the video, keep a recent frame behind it for its frosted glass.
-      // One frame each time the control bar appears is enough under its blur. Grabbing frames
-      // continuously made mpv's picture stutter and tear on Windows.
+      // Grabbing a frame while the video plays makes mpv's picture tear on Windows (tested on a real
+      // PC), so the frame behind the glass bar is only taken while paused.
       const bar = !!rect?.holes.some(h => h.bar);
-      if (surface && bar && !barShown) {
+      const paused = !!mpvMedia.current?.paused;
+      if (surface && bar && paused && !barShown) {
         void bridge.snapshot().then(url => { if (url && mpvSurface.current === surface) surface.style.backgroundImage = `url("${url}")`; }).catch(() => {});
       }
-      barShown = bar;
+      barShown = bar && paused;
       if (key !== last) { last = key; void bridge.place(rect).catch(() => {}); }
     };
     measure();

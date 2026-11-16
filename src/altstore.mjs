@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.30': 'On Windows, MKV and other videos playing with the built-in mpv engine are smooth again, with no stutter and no tearing lines.',
   '0.1.29': 'On Windows, fast motion and scene changes in videos playing with the built-in mpv engine no longer tear.',
   '0.1.28': 'On Windows, interlaced videos (TV and camcorder recordings) playing with the built-in mpv engine are deinterlaced, so they no longer flicker.',
   '0.1.27': 'On Windows, video playing with the built-in mpv engine no longer flickers.',
