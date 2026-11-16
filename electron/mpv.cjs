@@ -179,7 +179,10 @@ class MpvEngine {
       return;
     }
     if (msg.event === 'file-loaded') { void this.announceLoaded(); return; }
-    if (msg.event === 'end-file') { if (msg.reason === 'error') this.send({ type: 'error', message: msg.file_error || 'Could not open this video.' }); return; }
+    // While a new file is being opened, the previous one ends; its end (even a failed one) is not the
+    // new file's error. Only errors after the new file has started count.
+    if (msg.event === 'start-file') { this.starting = false; return; }
+    if (msg.event === 'end-file') { if (msg.reason === 'error' && !this.starting) this.send({ type: 'error', message: msg.file_error || 'Could not open this video.' }); return; }
     if (msg.event === 'playback-restart') this.send({ type: 'restart' });
   }
 
@@ -206,6 +209,7 @@ class MpvEngine {
     await this.raw(['set_property', 'volume', Math.round(Math.max(0, Math.min(1, Number(volume) || 0)) * 100)]);
     await this.raw(['set_property', 'speed', Number(speed) || 1]);
     await this.raw(['set_property', 'mute', !!muted]);
+    this.starting = true;
     await this.raw(['loadfile', file, 'replace']);
   }
 

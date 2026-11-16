@@ -100,7 +100,7 @@ export default function App() {
   const [isFullscreen,setIsFullscreen] = useState(false);
   const [videoZoom,setVideoZoom] = useState(1); const [videoPan,setVideoPan] = useState({x:0,y:0});
   // Playback engine: direct decoding, or FFmpeg live conversion for formats that stutter or fail.
-  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0); const mpvMedia = useRef<MpvMedia | null>(null); const mpvReady = useRef(false); const mpvBlocked = useRef(new Set<string>()); const mpvSurface = useRef<HTMLDivElement>(null); const mediaHandlers = useRef<Record<string, () => void>>({});
+  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0); const mpvMedia = useRef<MpvMedia | null>(null); const mpvReady = useRef(false); const mpvBlocked = useRef(new Set<string>()); const mpvRetried = useRef(new Set<string>()); const mpvSurface = useRef<HTMLDivElement>(null); const mediaHandlers = useRef<Record<string, () => void>>({});
   const [analysis,setAnalysis] = useState<Analysis|null>(null); const analysisRef = useRef<Analysis|null>(null);
   const [frameStats,setFrameStats] = useState<{dropped:number;total:number}|null>(null);
   const [osd,setOsd] = useState(''); const osdTimer = useRef(0);
@@ -892,7 +892,11 @@ export default function App() {
     const item = itemsRef.current.find(i => i.id === activeRef.current);
     const at = pendingSeek.current ?? now();
     // The built-in engine couldn't open it: fall back to conversion for this video.
-    if (item && engineRef.current === 'mpv') { mpvBlocked.current.add(item.id); void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return; }
+    // A hiccup (the engine restarting, a stray error while reopening) gets one more try in mpv first.
+    if (item && engineRef.current === 'mpv') {
+      if (mpvRetried.current.has(item.id)) mpvBlocked.current.add(item.id); else mpvRetried.current.add(item.id);
+      void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return;
+    }
     if (item?.native && window.videe?.liveSource) {
       if (engineRef.current === 'direct' && !triedLive.current && engineChoice(item.id) !== 'direct') { triedLive.current = true; void switchEngine('live', t('Converting video for playback')); return; }
       if (engineRef.current === 'live' && recoveries.current < 2) { recoveries.current++; void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return; }

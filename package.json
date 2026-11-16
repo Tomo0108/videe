@@ -23,7 +23,7 @@
     "test:fixtures": "node scripts/create-fixtures.mjs",
     "test:browser": "node scripts/verify-browser.mjs",
     "test:desktop": "node scripts/verify-desktop.mjs",
-    "test:mpv": "node scripts/verify-mpv.mjs",
+    "test:mpv": "node scripts/verify-mpv.mjs && node scripts/verify-mpv-reopen.mjs",
     "ios:build": "npm run ios:sync && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath /tmp/videe-ios-build CODE_SIGNING_ALLOWED=NO build",
     "test:library": "node scripts/verify-library.mjs",
     "icons:build": "node scripts/build-icons.mjs",
