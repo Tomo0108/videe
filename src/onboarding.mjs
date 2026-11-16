@@ -24,11 +24,14 @@ export function shouldAutoStartTour({ storage, webdriver = false, search = '' })
 
 /**
  * Which edition of the quick guide to show: the Mac app (or a Mac browser) gets the Mac
- * guide, everything else the Windows one.
- * @param {{ platform?: string, userAgent?: string }} env
- * @returns {'mac'|'win'}
+ * guide, iPhone and iPad the iOS one, everything else the Windows one.
+ * @param {{ platform?: string, userAgent?: string, touch?: boolean }} env
+ * @returns {'mac'|'win'|'ios'}
  */
-export function guideEdition({ platform = '', userAgent = '' }) {
-  if (platform) return platform === 'darwin' ? 'mac' : 'win';
-  return /Macintosh|Mac OS X/.test(userAgent) && !/iPhone|iPad|Mobile/.test(userAgent) ? 'mac' : 'win';
+export function guideEdition({ platform = '', userAgent = '', touch = false }) {
+  if (platform) return platform === 'darwin' ? 'mac' : platform === 'ios' ? 'ios' : 'win';
+  if (/iPhone|iPad|iPod/.test(userAgent)) return 'ios';
+  // iPadOS asks for desktop sites with a Mac user agent; a touch screen gives it away.
+  if (/Macintosh|Mac OS X/.test(userAgent)) return touch ? 'ios' : 'mac';
+  return 'win';
 }

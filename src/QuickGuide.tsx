@@ -1,20 +1,21 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import type {LucideIcon} from 'lucide-react';
-import {ArrowLeft,Camera,Captions,Download,FastForward,FolderOpen,FolderPlus,Info,Lightbulb,Heart,Keyboard,LayoutGrid,LifeBuoy,List,ListPlus,LockKeyhole,Maximize,MonitorCog,Play,Rewind,Scissors,Search,Settings2,ShieldCheck,Sparkles,Upload} from 'lucide-react';
+import {ArrowLeft,Camera,Captions,Download,Ellipsis,FastForward,FolderOpen,FolderPlus,Info,Lightbulb,Heart,Keyboard,LayoutGrid,LifeBuoy,List,ListPlus,LockKeyhole,Maximize,MonitorCog,Play,Rewind,Scissors,Search,Settings2,ShieldCheck,Sparkles,Upload} from 'lucide-react';
 import {Modal} from './Modal';
 import shots from './guide/shots.json';
 import {guideEdition} from './onboarding.mjs';
 import {getLanguage,t,type Language} from './i18n.mjs';
+import {ALTSTORE_JSON} from './altstore.mjs';
 
 type Shot = keyof typeof shots;
-type Edition = 'win' | 'mac';
+type Edition = 'win' | 'mac' | 'ios';
 type Scene = 'start' | 'library' | 'player' | 'editor' | 'settings';
 /** x, y, width, height in percent of the image, then which edge carries the number. */
 type Rect = [number, number, number, number, ('left' | 'right')?];
 // Screenshots of each edition, in each language, e.g. ./guide/player-mac-ja.webp. Bundled, so the guide works offline.
 const IMAGES = Object.fromEntries(Object.entries(import.meta.glob('./guide/*.webp', {eager: true, import: 'default', query: '?url'}) as Record<string, string>).map(([path, url]) => [path.replace(/^.*\/|\.webp$/g, ''), url])) as Record<Shot, string>;
-/** The edition this app should show: Mac for the Mac app, Windows otherwise. */
-export const currentEdition = (): Edition => guideEdition({platform: window.videe?.platform, userAgent: navigator.userAgent});
+/** The edition this app should show: Mac for the Mac app, iOS on iPhone and iPad, Windows otherwise. */
+export const currentEdition = (): Edition => guideEdition({platform: window.videe?.platform, userAgent: navigator.userAgent, touch: navigator.maxTouchPoints > 1});
 /** Opens the guide: F1 on Windows, ⌘? on Mac (F1 works on both). */
 export const isGuideShortcut = (e: KeyboardEvent) => e.key === 'F1' || ((e.metaKey || e.ctrlKey) && e.key === '?');
 
@@ -29,7 +30,83 @@ type Point = {mark?: string; body: ReactNode};
 type Step = {id: string; title: string; icon: LucideIcon; lead: ReactNode; shot?: Scene; points: Point[]; tip?: ReactNode};
 
 function steps(os: Edition, language: Language): Step[] {
+  if (os === 'ios') return language === 'ja' ? stepsIosJa() : stepsIosEn();
   return language === 'ja' ? stepsJa(os) : stepsEn(os);
+}
+
+// iPhone and iPad: sideloaded with AltStore or Sideloadly; videos arrive from the Files app or the picker.
+function stepsIosJa(): Step[] {
+  return [
+  {id: 'install', title: 'インストールと起動', icon: Download, lead: 'iPhone / iPad 版は App Store ではなく、AltStore か Sideloadly で入れます。', points: [
+    {body: <>AltStore の <b>Browse</b> → <b>Sources</b> で <b>＋</b> を押し、<code>{ALTSTORE_JSON}</code> を追加して Videe を入手します。新しい版が出ると AltStore から更新できます。</>},
+    {body: <>Sideloadly を使う場合は、リリースページの <code>Videe-バージョン-ios.ipa</code> をパソコンにダウンロードし、iPhone をつないで Sideloadly に読み込ませます。</>},
+    {body: <>初回は iPhone の <b>設定</b> → <b>一般</b> → <b>VPN とデバイス管理</b> で自分の Apple ID を信頼してから、ホーム画面の Videe を開きます。</>},
+  ], tip: <>無料の Apple ID で入れたアプリは 7 日ごとに再署名が必要です。AltStore の <b>My Apps</b> で <b>Refresh</b> を押してください。ライブラリや設定はそのまま残ります。</>},
+  {id: 'open', title: '動画を開く', icon: Upload, shot: 'start', lead: '見たい動画をライブラリへ追加します。', points: [
+    {mark: 'openVideo', body: <><UI icon={Upload}>{t('Open video')}</UI> で写真やファイルから動画を選びます。複数まとめて選べます。</>},
+    {mark: 'openFolder', body: <><UI icon={FolderOpen}>{t('Open folder')}</UI> でフォルダーの動画をまとめて追加します。</>},
+    {mark: 'drop', body: <><b>ファイル</b> アプリで動画を長押しし、<b>共有</b> → <b translate="no">Videe</b> を選んでも追加できます。</>},
+  ]},
+  {id: 'library', title: 'ライブラリを整理する', icon: LayoutGrid, shot: 'library', lead: '追加した動画はサムネイルで並びます。上のタブと検索で探せます。', points: [
+    {mark: 'nav', body: <><b>{t('All videos')}</b>、<b>{t('Continue watching')}</b>、<b>{t('Favorites')}</b> をタブで切り替えます。</>},
+    {mark: 'search', body: <><UI icon={Search}>{t('Search…')}</UI> にファイル名の一部を入力して絞り込みます。</>},
+    {mark: 'layout', body: <><UI icon={LayoutGrid}/> サムネイル表示と <UI icon={List}/> リスト表示を切り替えます。</>},
+    {mark: 'row', body: <>動画をタップすると再生します。<UI icon={Info}/> で情報の確認、お気に入り、フォルダーへの移動、削除ができます。長押しすると複数選択になります。</>},
+  ]},
+  {id: 'play', title: '再生する', icon: Play, shot: 'player', lead: '画面をタップすると操作バーが出ます。前回の続きから自動で再生されます。', points: [
+    {mark: 'back', body: <><UI icon={ArrowLeft}/> でライブラリに戻ります。再生は画面下のミニプレイヤーで続きます。</>},
+    {mark: 'seek', body: <>シークバーをドラッグして好きな位置へ移動します。</>},
+    {mark: 'transport', body: <><UI icon={Play}/> 再生・一時停止、<UI icon={Rewind}/> <UI icon={FastForward}/> で 10 秒戻る・進む。前後の動画にも移動できます。</>},
+    {mark: 'more', body: <><UI icon={Ellipsis}>{t('More controls')}</UI> から再生速度、<UI icon={Captions}/> 字幕、<UI icon={Camera}/> 静止画の保存、ズーム、操作ロックを使えます。</>},
+    {mark: 'fullscreen', body: <><UI icon={Maximize}/> で全画面にします。iPhone を横向きにすると大きく見られます。</>},
+  ]},
+  {id: 'settings', title: '設定を確認する', icon: Settings2, shot: 'settings', lead: <>右上の <UI icon={Settings2}>{t('Settings')}</UI> から開きます。</>, points: [
+    {mark: 'appearance', body: <><b>{t('Appearance')}</b> でライト、ダーク、システムに合わせるを選びます。<b>{t('Language')}</b> で日本語と英語を切り替えられます。</>},
+    {mark: 'resume', body: <><b>{t('Resume playback')}</b> を有効にすると、前回止めた位置から再生します。</>},
+  ], tip: <>ライブラリを人に見られたくないときは、設定の下にある <UI icon={LockKeyhole}>{t('Password lock')}</UI> で起動時のパスワードを設定できます。</>},
+  {id: 'help', title: '困ったときは', icon: LifeBuoy, lead: 'よくある症状と対処です。', points: [
+    {body: <><b>アプリが開かなくなった</b>：署名の期限（7 日）が切れています。AltStore の <b>My Apps</b> で <b>Refresh</b> を押すか、Sideloadly でもう一度入れます。</>},
+    {body: <><b>再生できない動画がある</b>：AVI や一部の MKV など iPhone が対応していない形式は再生できません。Mac / Windows 版の Videe で再生するか、書き出しで MP4 に変換してください。</>},
+    {body: <><b>「信頼されていないデベロッパ」と表示される</b>：<b>設定</b> → <b>一般</b> → <b>VPN とデバイス管理</b> で自分の Apple ID を信頼します。<UI icon={ShieldCheck}/></>},
+  ]},
+  ];
+}
+
+function stepsIosEn(): Step[] {
+  return [
+  {id: 'install', title: 'Install and open Videe', icon: Download, lead: 'The iPhone and iPad app is not on the App Store. Install it with AltStore or Sideloadly.', points: [
+    {body: <>In AltStore, go to <b>Browse</b> → <b>Sources</b>, press <b>+</b>, add <code>{ALTSTORE_JSON}</code> and get Videe. New versions then update from AltStore.</>},
+    {body: <>With Sideloadly, download <code>Videe-version-ios.ipa</code> from the releases page to your computer, connect the iPhone and load the file in Sideloadly.</>},
+    {body: <>The first time, trust your Apple ID in <b>Settings</b> → <b>General</b> → <b>VPN &amp; Device Management</b>, then open Videe from the Home Screen.</>},
+  ], tip: <>Apps installed with a free Apple ID must be re-signed every 7 days. Press <b>Refresh</b> in AltStore’s <b>My Apps</b>. Your library and settings stay.</>},
+  {id: 'open', title: 'Open videos', icon: Upload, shot: 'start', lead: 'Add the videos you want to watch to the library.', points: [
+    {mark: 'openVideo', body: <><UI icon={Upload}>{t('Open video')}</UI> picks videos from Photos or Files. You can choose several at once.</>},
+    {mark: 'openFolder', body: <><UI icon={FolderOpen}>{t('Open folder')}</UI> adds the videos in a folder.</>},
+    {mark: 'drop', body: <>In the <b>Files</b> app, touch and hold a video, then choose <b>Share</b> → <b translate="no">Videe</b>.</>},
+  ]},
+  {id: 'library', title: 'Organize the library', icon: LayoutGrid, shot: 'library', lead: 'Your videos appear as thumbnails. Use the tabs and search to find them.', points: [
+    {mark: 'nav', body: <>Switch between <b>{t('All videos')}</b>, <b>{t('Continue watching')}</b> and <b>{t('Favorites')}</b> with the tabs.</>},
+    {mark: 'search', body: <>Type part of a file name in <UI icon={Search}>{t('Search…')}</UI> to filter.</>},
+    {mark: 'layout', body: <><UI icon={LayoutGrid}/> shows thumbnails and <UI icon={List}/> a list.</>},
+    {mark: 'row', body: <>Tap a video to play it. <UI icon={Info}/> shows its details and lets you favorite, move or remove it. Touch and hold to select several.</>},
+  ]},
+  {id: 'play', title: 'Play', icon: Play, shot: 'player', lead: 'Tap the video to show the controls. Videos continue where you left off.', points: [
+    {mark: 'back', body: <><UI icon={ArrowLeft}/> goes back to the library. Playback continues in the mini player at the bottom.</>},
+    {mark: 'seek', body: <>Drag the seek bar to move through the video.</>},
+    {mark: 'transport', body: <><UI icon={Play}/> plays and pauses; <UI icon={Rewind}/> <UI icon={FastForward}/> go back or forward 10 seconds. You can also skip to the previous or next video.</>},
+    {mark: 'more', body: <><UI icon={Ellipsis}>{t('More controls')}</UI> holds speed, <UI icon={Captions}/> subtitles, <UI icon={Camera}/> save frame, zoom and the control lock.</>},
+    {mark: 'fullscreen', body: <><UI icon={Maximize}/> goes full screen. Turn the iPhone sideways for a bigger picture.</>},
+  ]},
+  {id: 'settings', title: 'Check the settings', icon: Settings2, shot: 'settings', lead: <>Open <UI icon={Settings2}>{t('Settings')}</UI> at the top right.</>, points: [
+    {mark: 'appearance', body: <><b>{t('Appearance')}</b> picks light, dark or system. <b>{t('Language')}</b> switches between Japanese and English.</>},
+    {mark: 'resume', body: <>With <b>{t('Resume playback')}</b> on, videos continue where you stopped.</>},
+  ], tip: <>To keep your library private, set a password in <UI icon={LockKeyhole}>{t('Password lock')}</UI> near the bottom of Settings.</>},
+  {id: 'help', title: 'Troubleshooting', icon: LifeBuoy, lead: 'Common problems and what to do.', points: [
+    {body: <><b>The app no longer opens</b>: its 7-day signature expired. Press <b>Refresh</b> in AltStore’s <b>My Apps</b>, or install it again with Sideloadly.</>},
+    {body: <><b>Some videos don’t play</b>: formats the iPhone can’t decode, such as AVI and some MKV files, don’t play. Play them in Videe for Mac or Windows, or export them as MP4 there.</>},
+    {body: <><b>“Untrusted Developer”</b>: trust your Apple ID in <b>Settings</b> → <b>General</b> → <b>VPN &amp; Device Management</b>. <UI icon={ShieldCheck}/></>},
+  ]},
+  ];
 }
 
 // Control names come from t() so the guide always matches the labels on screen.
@@ -185,13 +262,13 @@ function Figure({shot, points}: {shot: Shot; points: Point[]}) {
   </figure>;
 }
 
-/** Illustrated quick guide, in a Windows and a Mac edition. Screenshots and callouts come from scripts/build-guide.mjs. */
+/** Illustrated quick guide, in Windows, Mac and iPhone/iPad editions. Screenshots and callouts come from scripts/build-guide.mjs. */
 export function QuickGuide({version, edition = currentEdition(), onClose, onStartTour}: {version: string; edition?: Edition; onClose: () => void; onStartTour?: () => void}) {
   const language = getLanguage();
   const STEPS = steps(edition, language);
   const body = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(STEPS[0].id);
-  const meta = t(edition === 'mac' ? 'Mac edition · Videe {version}' : 'Windows edition · Videe {version}', {version});
+  const meta = t(edition === 'mac' ? 'Mac edition · Videe {version}' : edition === 'ios' ? 'iPhone and iPad edition · Videe {version}' : 'Windows edition · Videe {version}', {version});
   const jump = (id: string) => { setCurrent(id); body.current?.querySelector(`#guide-${id}`)?.scrollIntoView({behavior: document.documentElement.dataset.motion === 'off' ? 'auto' : 'smooth', block: 'start'}); };
   // Highlights the step being read in the side panel.
   useEffect(() => {

@@ -34,8 +34,10 @@ const browser = await chromium.launch();
 let lang = 'ja';
 /** A control's label as the app shows it in the language being captured. */
 const L = (text, vars) => translate(text, vars, lang);
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
 async function newPage(os, { width = 1280, height = 800, desktop = false, prefs = { theme: 'light', layout: 'grid', layoutVersion: 2, autoplay: false } } = {}) {
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: SCALE, colorScheme: 'light', reducedMotion: 'reduce' });
+  const phone = os === 'ios';
+  const page = await browser.newPage({ viewport: phone ? { width: 390, height: 844 } : { width, height }, deviceScaleFactor: phone ? 2 : SCALE, colorScheme: 'light', reducedMotion: 'reduce', ...(phone ? { userAgent: IPHONE_UA, isMobile: true, hasTouch: true } : {}) });
   await page.addInitScript(value => localStorage.setItem('videe-preferences', value), JSON.stringify(prefs));
   if (desktop) await page.addInitScript(platform => {
     // Just enough of the desktop bridge to show its settings rows.
@@ -79,7 +81,8 @@ async function capture(page, scene, marks, clip) {
   await page.screenshot({ path: png, clip });
   const result = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-i', png, '-c:v', 'libwebp', '-quality', '82', '-compression_level', '6', join(out, `${name}.webp`)], { stdio: 'inherit' });
   if (result.status !== 0) throw new Error(`Could not encode ${name}.webp`);
-  shots[name] = { width: Math.round(area.width * SCALE), height: Math.round(area.height * SCALE), marks: rects };
+  const scale = page.os === 'ios' ? 2 : SCALE;
+  shots[name] = { width: Math.round(area.width * scale), height: Math.round(area.height * scale), marks: rects };
   console.log(`${name}: ${Object.keys(rects).join(', ')}`);
 }
 
@@ -140,9 +143,37 @@ await capture(page, 'settings', {
 }, { x: dialog.x, y: dialog.y, width: dialog.width, height: diagnostics.y + diagnostics.height + 16 - dialog.y });
 await page.close();
 }
+// iPhone: the same app at phone size, with the touch layout (tabs, More menu, bottom sheets).
+async function phoneEdition() {
+  const videos = SAMPLE_FILES[lang];
+  const page = await newPage('ios');
+  await page.waitForSelector('.no-results h2', { state: 'attached' });
+  await capture(page, 'start', { openVideo: '.header-open-video', openFolder: '.header-open', drop: '.no-results' });
+  await page.locator('input.file-input').setInputFiles(videos.map(file => ({ name: basename(file), mimeType: 'video/mp4', buffer: readFileSync(file) })));
+  await page.getByRole('button', { name: L('Back to library'), exact: true }).click();
+  await page.getByRole('button', { name: L('Close player'), exact: true }).click();
+  await page.waitForFunction(count => document.querySelectorAll('.video-card').length >= count, videos.length);
+  await page.waitForFunction(() => [...document.querySelectorAll('.video-card img')].every(img => img.complete && img.naturalWidth > 0) && document.querySelectorAll('.video-card img').length > 0, null, { timeout: 120000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  await capture(page, 'library', { nav: '.library-tabs', search: '.search-box', layout: '.layout-switch', row: '.video-grid .video-card >> nth=0' });
+  const names = videos.map(file => file.split(/[\\/]/).pop());
+  await page.getByLabel(L('Play {name}', { name: names[OCEAN] }), { exact: true }).click();
+  await page.waitForFunction(() => (document.querySelector('.player-view video')?.readyState || 0) >= 2);
+  await page.evaluate(() => { const video = document.querySelector('.player-view video'); video.pause(); video.currentTime = video.duration * 0.38; });
+  await page.waitForTimeout(600);
+  await page.mouse.move(195, 400);
+  await capture(page, 'player', { back: `[aria-label="${L('Back to library')}"]`, seek: '.seek-bar', transport: '.transport', more: ['.more-toggle', 'right'], fullscreen: [`.player-controls [aria-label="${L('Full screen')}"]`, 'right'] });
+  await page.getByRole('button', { name: L('Back to library'), exact: true }).click();
+  await page.getByRole('button', { name: L('Settings'), exact: true }).click();
+  await page.waitForSelector('dialog.modal');
+  await page.waitForTimeout(500);
+  await capture(page, 'settings', { appearance: `.setting-row:has([aria-label="${L('Language')}"]), .setting-row:has([aria-label="${L('Appearance')}"])`, resume: `.setting-row:has([aria-label="${L('Resume playback')}"])` });
+  await page.close();
+}
 for (lang of ['ja', 'en']) {
   await edition('win');
   await edition('mac');
+  await phoneEdition();
 }
 
 await browser.close();

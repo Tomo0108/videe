@@ -85,8 +85,10 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then TAG="$GITHUB_REF_NAME"; else TAG="v$VERSION"; fi
           FILES=()
           while IFS= read -r file; do FILES+=("$file"); done < <(find dist-apps -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.ipa' \))
-          NOTES=$(node --input-type=module -e "import { githubReleaseNotes } from './src/altstore.mjs'; import { RELEASE_VERSION } from './src/release.mjs'; process.stdout.write(githubReleaseNotes(RELEASE_VERSION));")
+          NOTES=$(node scripts/release-notes.mjs)
           if [ "${#FILES[@]}" -eq 0 ]; then echo "No app artifacts"; exit 1; fi
+          cp docs/release-guide/quick-guide.html dist-apps/Videe-quick-guide.html
+          FILES+=("dist-apps/Videe-quick-guide.html")
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${FILES[@]}" --clobber
             gh release edit "$TAG" --title "Videe $VERSION" --notes "$NOTES"

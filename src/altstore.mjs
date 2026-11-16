@@ -5,6 +5,7 @@ export const ALTSTORE_JSON = `${SITE_ORIGIN}/altstore.json`;
 export const ALTSTORE_ADD = `altstore://source?url=${encodeURIComponent(ALTSTORE_JSON)}`;
 
 const NOTES = {
+  '0.1.22': 'Release pages now include an illustrated quick guide for Mac, Windows, and iPhone / iPad, and the in-app guide has an iPhone / iPad edition.',
   '0.1.21': 'The empty library is now just the two buttons for choosing videos or a folder.',
   '0.1.20': 'Flatter buttons and icons with no glows or blurred backdrops, and a simpler empty library.',
   '0.1.19': 'Cleaner icons without the glow, and the empty library buttons now read simply "Choose videos" and "Choose a folder".',

@@ -10,3 +10,5 @@ if (isPlayerHtml('dist/index.html')) {
 }
 const altstore = spawnSync(process.execPath, ['scripts/write-altstore.mjs', 'dist/altstore.json'], { stdio: 'inherit' });
 if (altstore.status !== 0) throw new Error('Could not refresh AltStore source');
+// The quick guide linked from release pages, with its fonts, icons and screenshots embedded.
+copyFileSync('docs/release-guide/quick-guide.html', 'dist/quick-guide.html');
