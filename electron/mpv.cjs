@@ -8,9 +8,9 @@
 //
 // On Linux the engine can be turned on for tests with VIDEE_MPV=1 and VIDEE_MPV_NODE=<node>
 // (system libmpv, no picture or sound), which is enough to test the control path.
-const { screen } = require('electron');
+const { screen, nativeImage } = require('electron');
 const { join } = require('node:path');
-const { existsSync } = require('node:fs');
+const { existsSync, promises: fs } = require('node:fs');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
 
@@ -41,6 +41,7 @@ class ChildWindow {
     this.setRegion = user32.func('SetWindowRgn', 'int', ['intptr_t', 'intptr_t', 'bool']);
     const gdi32 = loadKoffi().load('gdi32.dll');
     this.rectRegion = gdi32.func('CreateRectRgn', 'intptr_t', ['int', 'int', 'int', 'int']);
+    this.roundRegion = gdi32.func('CreateRoundRectRgn', 'intptr_t', ['int', 'int', 'int', 'int', 'int', 'int']);
     this.combineRegion = gdi32.func('CombineRgn', 'int', ['intptr_t', 'intptr_t', 'intptr_t', 'int']);
     this.deleteObject = gdi32.func('DeleteObject', 'bool', ['intptr_t']);
     this.regionKey = '';
@@ -60,13 +61,15 @@ class ChildWindow {
   }
   /** Cuts the page's bars (controls, header) out of the window, so they show over the video without resizing it. */
   cut(holes) {
-    const key = holes.map(h => `${h.x},${h.y},${h.width},${h.height}`).join(';');
+    const key = holes.map(h => `${h.x},${h.y},${h.width},${h.height},${h.radius || 0}`).join(';');
     if (key === this.regionKey) return;
     this.regionKey = key;
     if (!holes.length) { this.setRegion(this.hwnd, 0, true); return; }
     const region = this.rectRegion(-1, -1, 100000, 100000);
     for (const h of holes) {
-      const hole = this.rectRegion(h.x, h.y, h.x + h.width, h.y + h.height);
+      // Rounded like the bar itself, so the video shows around its corners.
+      const d = Math.round((h.radius || 0) * 2);
+      const hole = d > 1 ? this.roundRegion(h.x, h.y, h.x + h.width + 1, h.y + h.height + 1, d, d) : this.rectRegion(h.x, h.y, h.x + h.width, h.y + h.height);
       this.combineRegion(region, region, hole, 4); // RGN_DIFF
       this.deleteObject(hole);
     }
@@ -99,7 +102,7 @@ class MpvEngine {
       'input-default-bindings': 'no', 'input-vo-keyboard': 'no', 'input-cursor': 'no', 'input-cursor-passthrough': 'yes', 'cursor-autohide': 'no',
       'keep-open': 'yes', idle: 'yes', 'force-window': 'no', 'audio-display': 'no', 'sub-auto': 'no', 'save-position-on-quit': 'no',
       hwdec: 'auto-safe', vo: 'gpu-next', background: 'color', 'background-color': '#000000',
-      'hr-seek': 'yes', 'demuxer-max-bytes': '150MiB', 'sub-visibility': 'no',
+      'hr-seek': 'yes', 'screenshot-format': 'jpg', 'screenshot-jpeg-quality': '80', 'demuxer-max-bytes': '150MiB', 'sub-visibility': 'no',
     };
     // Tests on Linux run mpv without a picture or sound; only the control path is checked there.
     if (process.platform !== 'win32') Object.assign(options, { vo: 'null', ao: 'null', hwdec: 'no' });
@@ -213,8 +216,27 @@ class MpvEngine {
     if (!this.child) return;
     if (!rect || this.win.isDestroyed()) { this.child.place(null); return; }
     const scale = this.win.webContents.getZoomFactor() * screen.getDisplayMatching(this.win.getBounds()).scaleFactor;
-    const px = box => ({ x: Math.round(box.x * scale), y: Math.round(box.y * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale) });
+    const px = box => ({ x: Math.round(box.x * scale), y: Math.round(box.y * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale), radius: Math.round((box.radius || 0) * scale) });
     this.child.place({ ...px(rect), holes: (rect.holes || []).map(px) });
+  }
+
+  /**
+   * A small JPEG of the current frame, as a data URL. The page puts it behind the control bar,
+   * whose frosted glass then blurs the picture as it does over a <video>. The temporary file is
+   * overwritten each time and removed right after it's read.
+   */
+  async snapshot() {
+    if (this.shooting) return null;
+    this.shooting = true;
+    const file = join(require('node:os').tmpdir(), `videe-mpv-${process.pid}.jpg`);
+    try {
+      await this.raw(['screenshot-to-file', file, 'video']);
+      const image = nativeImage.createFromBuffer(await fs.readFile(file));
+      if (image.isEmpty()) return null;
+      const { width } = image.getSize();
+      return `data:image/jpeg;base64,${(width > 640 ? image.resize({ width: 640, quality: 'good' }) : image).toJPEG(70).toString('base64')}`;
+    } catch { return null; }
+    finally { this.shooting = false; fs.rm(file, { force: true }).catch(() => {}); }
   }
 
   async stop() {

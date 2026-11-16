@@ -14,7 +14,8 @@ export type MpvBridge = {
   open(id: string, options: { volume: number; speed: number; muted: boolean }): Promise<void>;
   set(name: string, value: unknown): Promise<void>;
   command(name: string, args: (string | number)[]): Promise<unknown>;
-  place(rect: { x: number; y: number; width: number; height: number; holes?: { x: number; y: number; width: number; height: number }[] } | null): Promise<void>;
+  place(rect: { x: number; y: number; width: number; height: number; holes?: { x: number; y: number; width: number; height: number; radius?: number }[] } | null): Promise<void>;
+  snapshot(): Promise<string | null>;
   stop(): Promise<void>;
   onEvent(cb: (event: MpvEvent) => void): () => void;
 };
