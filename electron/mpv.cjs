@@ -103,11 +103,14 @@ class MpvEngine {
       config: 'no', 'load-scripts': 'no', ytdl: 'no', osc: 'no', 'osd-level': '0', terminal: 'no',
       'input-default-bindings': 'no', 'input-vo-keyboard': 'no', 'input-cursor': 'no', 'input-cursor-passthrough': 'yes', 'cursor-autohide': 'no',
       'keep-open': 'yes', idle: 'yes', 'force-window': 'no', 'audio-display': 'no', 'sub-auto': 'no', 'save-position-on-quit': 'no',
+      // In a child window, a flip-model swap chain presents outside the page's composition and tears
+      // like vsync is off. The blit model lets Windows compose it with the page, in step with the display.
+      'gpu-api': 'd3d11', 'd3d11-flip': 'no',
       hwdec: 'auto-safe', vo: 'gpu-next', background: 'color', 'background-color': '#000000',
       'hr-seek': 'yes', 'screenshot-format': 'jpg', 'screenshot-jpeg-quality': '80', 'demuxer-max-bytes': '150MiB', 'sub-visibility': 'no',
     };
     // Tests on Linux run mpv without a picture or sound; only the control path is checked there.
-    if (process.platform !== 'win32') Object.assign(options, { vo: 'null', ao: 'null', hwdec: 'no' });
+    if (process.platform !== 'win32') { Object.assign(options, { vo: 'null', ao: 'null', hwdec: 'no' }); delete options['gpu-api']; delete options['d3d11-flip']; }
     for (const key of Object.keys(options)) if (options[key] === '') delete options[key];
     // Electron runs the host as plain Node. Linux tests use a separate Node (VIDEE_MPV_NODE), since
     // there libmpv's FFmpeg would clash with the one Electron loads.

@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.29': 'On Windows, fast motion and scene changes in videos playing with the built-in mpv engine no longer tear.',
   '0.1.28': 'On Windows, interlaced videos (TV and camcorder recordings) playing with the built-in mpv engine are deinterlaced, so they no longer flicker.',
   '0.1.27': 'On Windows, video playing with the built-in mpv engine no longer flickers.',
   '0.1.26': 'On Windows, the control bar over a video playing with the built-in mpv engine is frosted glass over the picture again, with rounded corners that match.',
