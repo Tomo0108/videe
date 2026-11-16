@@ -25,10 +25,10 @@ try {
   for (const [i, t] of [2, 9, 4, 11, 1, 7, 3, 10, 5].entries()) { await page.getByRole('slider',{name:'Playback position',exact:true}).fill(String(t)); await page.waitForTimeout(i % 2 ? 60 : 220); }
   await page.waitForFunction(()=>{const v=document.querySelector('.player-view video');return v&&v.currentSrc.includes('t=5')&&!v.error&&v.readyState>=2;},null,{timeout:20000});
   assert.equal(await page.getByText('Can’t play',{exact:false}).count(), 0);
-  // Playback details offer a seekable optimized copy.
+  // Playback details offer a seekable playback copy.
   await page.getByRole('button',{name:'Playback details',exact:true}).first().click();
   await page.getByText('Smooth playback',{exact:false}).first().waitFor();
-  await page.getByRole('button',{name:'Create optimized copy',exact:true}).click();
+  await page.getByRole('button',{name:'Create playback copy',exact:true}).click();
   await page.waitForFunction(()=>{const v=document.querySelector('video');return v&&v.currentSrc.includes('converted=')&&!v.error&&v.readyState>=2;},null,{timeout:60000});
   assert.match(await page.locator('video').getAttribute('src'),/^videe:\/\/media\//);
   await page.getByRole('slider',{name:'Playback position',exact:true}).fill('6');
@@ -57,5 +57,5 @@ try {
   await page.getByRole('button',{name:'Play legacy.avi',exact:true}).click();
   await page.waitForFunction(()=>{const v=document.querySelector('video');return v&&v.readyState>=2;});
   assert.deepEqual(errors,[]);
-  console.log('PASS: native file selection, live conversion of unsupported codecs, optimized copy, editor export, real playback, range seek, registry persistence, isolated renderer.');
+  console.log('PASS: native file selection, live conversion of unsupported codecs, playback copy, editor export, real playback, range seek, registry persistence, isolated renderer.');
 } catch(error) { console.error('Page errors:',errors);  console.error((await page.locator('body').innerText()).slice(0,1500)); await page.screenshot({path:'/tmp/videe-desktop-failure.png'}); throw error; } finally { await app.close(); await rm(userData,{recursive:true,force:true}); }

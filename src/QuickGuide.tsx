@@ -172,7 +172,7 @@ function stepsJa(os: Edition): Step[] {
     {body: <><b>再生がカクつく、映像が出ない</b>：<UI icon={Settings2}>{t('Settings')}</UI> の <b>{t('Smooth playback')}</b> を <b>{t('Automatic')}</b> にします。プレイヤー上部の <UI icon={Sparkles}>{t('Smooth playback')}</UI> 表示を押すと、再生方式の詳細が見られます。</>},
     mac ? {body: <><b>{t('Video decoding')}が「{t('Software fallback')}」になる</b>：macOS を最新にして Videe を再起動します。<b>{t('Hardware acceleration')}</b> がオンになっているかも確認してください。</>} :
     {body: <><b>{t('Video decoding')}が「{t('Software fallback')}」になる</b>：グラフィックドライバーを更新するか、Windows の <b>設定</b> → <b>システム</b> → <b>ディスプレイ</b> → <b>グラフィック</b> で Videe に「高パフォーマンス」を割り当てます。</>},
-    {body: <><b>ディスクの空きが減った</b>：変換用のコピーは <b>{t('Optimized copies')}</b> の <b>{t('Clear')}</b> で削除できます。必要になれば自動で作り直します。</>},
+    {body: <><b>ディスクの空きが減った</b>：変換用のコピーは <b>{t('Playback copies')}</b> の <b>{t('Clear')}</b> で削除できます。必要になれば自動で作り直します。</>},
     ...(mac ? [{body: <><b>「壊れているため開けません」と表示される</b>：ターミナルで <code>xattr -cr /Applications/Videe.app</code> を実行してから開き直します。</>}] : []),
     mac ? {body: <><b>「開発元を確認できない」と表示される</b>：<b>システム設定</b> → <b>プライバシーとセキュリティ</b> の <b>このまま開く</b> で起動できます。ダウンロード元が GitHub の Videe リリースページか確認してください。<UI icon={ShieldCheck}/></>} :
     {body: <><b>SmartScreen で起動できない</b>：<b>詳細情報</b> → <b>実行</b> で起動できます。ダウンロード元が GitHub の Videe リリースページか確認してください。<UI icon={ShieldCheck}/></>},
@@ -242,7 +242,7 @@ function stepsEn(os: Edition): Step[] {
     {body: <><b>Playback stutters or shows no picture</b>: set <b>{t('Smooth playback')}</b> in <UI icon={Settings2}>{t('Settings')}</UI> to <b>{t('Automatic')}</b>. Press the <UI icon={Sparkles}>{t('Smooth playback')}</UI> badge above the player for playback details.</>},
     mac ? {body: <><b>{t('Video decoding')} shows “{t('Software fallback')}”</b>: update macOS and restart Videe. Also check that <b>{t('Hardware acceleration')}</b> is on.</>} :
     {body: <><b>{t('Video decoding')} shows “{t('Software fallback')}”</b>: update the graphics driver, or assign “High performance” to Videe in Windows <b>Settings</b> → <b>System</b> → <b>Display</b> → <b>Graphics</b>.</>},
-    {body: <><b>Disk space went down</b>: <b>{t('Clear')}</b> next to <b>{t('Optimized copies')}</b> removes the converted copies. Videe makes them again when needed.</>},
+    {body: <><b>Disk space went down</b>: <b>{t('Clear')}</b> next to <b>{t('Playback copies')}</b> removes the converted copies. Videe makes them again when needed.</>},
     ...(mac ? [{body: <><b>macOS says the app “is damaged and can’t be opened”</b>: run <code>xattr -cr /Applications/Videe.app</code> in Terminal, then open it again.</>}] : []),
     mac ? {body: <><b>macOS can’t verify the developer</b>: open it with <b>Open Anyway</b> in <b>System Settings</b> → <b>Privacy &amp; Security</b>. Make sure you downloaded it from the Videe releases page on GitHub. <UI icon={ShieldCheck}/></>} :
     {body: <><b>SmartScreen blocks the app</b>: press <b>More info</b> → <b>Run anyway</b>. Make sure you downloaded it from the Videe releases page on GitHub. <UI icon={ShieldCheck}/></>},

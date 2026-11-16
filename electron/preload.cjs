@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('videe', {
   liveSource: (id, start, hardware) => ipcRenderer.invoke('live-source', id, start, hardware),
   stopLive: () => ipcRenderer.invoke('stop-live'),
   prepareVideo: id => ipcRenderer.invoke('prepare-video', id),
+  setAutoPrepare: enabled => ipcRenderer.invoke('set-auto-prepare', enabled),
+  onVideoPrepared: callback => { const handler = (_event, id) => callback(id); ipcRenderer.on('video-prepared', handler); return () => ipcRenderer.removeListener('video-prepared', handler); },
   useOriginal: id => ipcRenderer.invoke('use-original', id),
   thumbnail: id => ipcRenderer.invoke('thumbnail', id),
   filmstrip: (id, count) => ipcRenderer.invoke('filmstrip', id, count),

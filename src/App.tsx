@@ -37,9 +37,8 @@ type Engine = 'direct' | 'live';
 const CHROME_IDLE_MS = 1600;
 const ZOOM_STEPS = [1, 1.25, 1.5, 2, 3, 4];
 const CHROME_LEAVE_MS = 150;
-type JobKind = 'convert' | 'prepare' | 'export';
+type JobKind = 'convert' | 'export';
 // Files above this size start in live playback instead of waiting for a remux.
-const REMUX_LIMIT = 2 * 1024 ** 3;
 const SORT_COLUMNS: { id: LibrarySort; label: string }[] = [
   { id: 'name', label: 'Name' },
   { id: 'duration', label: 'Duration' },
@@ -305,20 +304,9 @@ export default function App() {
           if (length > 0) { setDuration(length); durationRef.current = length; }
           const stored = itemsRef.current.find(i => i.id === item.id)?.position || 0;
           const resumeAt = (!startFromBeginning.current || forceResume.current) && (prefsRef.current.resume || forceResume.current) && stored < length - 2 ? stored : 0;
-          if (mode === 'remux' && info.size <= REMUX_LIMIT && window.videe.prepareVideo) {
-            setJobKind('prepare'); setConversion(0); setConversionTotal(length);
-            let prepared = '';
-            try { prepared = (await window.videe.prepareVideo(item.id)).src; } catch { prepared = ''; }
-            finally { setConversion(null); setJobKind('convert'); }
-            if (sequence !== openSequence.current) return;
-            if (prepared) {
-              const refreshed = await window.videe.analyzeVideo(item.id).catch(() => null);
-              if (sequence !== openSequence.current) return;
-              if (refreshed) { analysisRef.current = refreshed; setAnalysis(refreshed); }
-              setSource(prepared); updateItem(item.id, {lastPlayed: Date.now()}); loadSubtitles(item, sequence);
-              return;
-            }
-          }
+          // Not prepared in the background yet: play right away through live conversion and
+          // move this file to the front of the queue so it plays directly next time.
+          if (mode === 'remux' && override !== 'live') void window.videe.prepareVideo?.(item.id).catch(() => {});
           updateItem(item.id, {lastPlayed: Date.now()});
           await startLive(item.id, resumeAt, continuePlayback);
           loadSubtitles(item, sequence);
@@ -777,6 +765,18 @@ export default function App() {
     }, 2000);
     return () => window.clearInterval(timer);
   }, [playing, engine, active?.id, active?.native, prefs.smooth, minimized, switchEngine]);
+  // Files the player can't open as they are get a playback copy in the background after they're added.
+  useEffect(() => { void Promise.resolve(window.videe?.setAutoPrepare?.(prefs.smooth === 'auto')).catch(() => {}); }, [prefs.smooth]);
+  // A copy finished for the video on screen: refresh its details, and if it is paused on live
+  // conversion, move it to the copy so seeking is instant from here on.
+  useEffect(() => { const off = window.videe?.onVideoPrepared?.(id => {
+    if (id !== activeRef.current || !window.videe) return;
+    void window.videe.analyzeVideo(id).then(refreshed => {
+      if (id !== activeRef.current) return;
+      analysisRef.current = refreshed; setAnalysis(refreshed);
+      if (engineRef.current === 'live' && videoRef.current?.paused && engineChoice(id) !== 'live') void switchEngine('direct').then(() => rememberEngine(id));
+    }).catch(() => {});
+  }); return typeof off === 'function' ? off : undefined; }, [switchEngine, engineChoice, rememberEngine]);
   useEffect(() => {
     if (modal !== 'playback') return;
     const sample = () => { const quality = videoRef.current?.getVideoPlaybackQuality?.(); if (quality) setFrameStats({dropped: quality.droppedVideoFrames, total: quality.totalVideoFrames}); };
@@ -879,25 +879,25 @@ export default function App() {
     seek(value);
   };
   const importSubtitle = async (file?: File) => { if(!file) return; try { if(file.size > 5*1024*1024) throw new Error('Choose a subtitle file smaller than 5 MB.'); const text = toVtt(await file.text()); setSubtitle({url:URL.createObjectURL(new Blob([text],{type:'text/vtt'})),name:file.name}); setCaptions(true); } catch(e) { notify(errorText(e, 'Could not load subtitles.')); } };
-  const convert = async (fast = false) => {
+  const convert = async () => {
     if(!active?.native || !window.videe) return;
     const id = active.id; const at = pendingSeek.current ?? now(); const play = !!videoRef.current && !videoRef.current.paused;
-    setJobKind(fast ? 'prepare' : 'convert'); setConversion(0); setConversionTotal(analysisRef.current?.info.duration || duration);
+    setJobKind('convert'); setConversion(0); setConversionTotal(analysisRef.current?.info.duration || duration);
     try {
-      const src = fast ? (await window.videe.prepareVideo(id)).src : await window.videe.convertVideo(id);
+      const src = await window.videe.convertVideo(id);
       if (activeRef.current !== id) return;
       rememberEngine(id); engineRef.current = 'direct'; liveOffset.current = 0; setEngine('direct');
       const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed);
       seekOnLoad.current = at; playAfterLoad.current = play; setError(''); setSource(src); setLoading(true);
-      notify(t('Optimized copy ready. Seeking is now instant.'));
+      notify(t('Playback copy ready. Seeking is now instant.'));
     } catch(e) { notify(errorText(e, 'Could not convert this video.')); }
     finally { setConversion(null); setJobKind('convert'); }
   };
-  const removeOptimized = async () => {
+  const removePlaybackCopy = async () => {
     if (!active?.native || !window.videe?.useOriginal) return;
     const id = active.id;
     try { await window.videe.useOriginal(id); rememberEngine(id); const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed); await switchEngine(refreshed?.plan.mode === 'direct' ? 'direct' : 'live'); rememberEngine(id); }
-    catch (e) { notify(errorText(e, 'Could not remove the optimized copy.')); }
+    catch (e) { notify(errorText(e, 'Could not remove the playback copy.')); }
   };
   const removeFromLibrary = async (ids: string[]) => {
     const unique = [...new Set(ids)].filter(id => itemsRef.current.some(item => item.id === id));
@@ -1035,7 +1035,7 @@ export default function App() {
     return () => { media.removeEventListener('change', syncDark); reducedMotion.removeEventListener('change', syncMotion); };
   }, [prefs.theme, prefs.motion]);
   const timeText = (seconds: number) => prefs.timecode ? timecode(seconds, fps) : timeLabel(seconds);
-  const engineLabel = engine === 'live' ? t('Smooth playback') : analysis?.converted === 'optimized' ? t('Optimized copy') : analysis?.converted === 'edited' ? t('Edited copy') : '';
+  const engineLabel = engine === 'live' ? t('Smooth playback') : analysis?.converted === 'edited' ? t('Edited copy') : '';
   const jobPercent = conversion !== null && conversionTotal ? Math.min(100, conversion / conversionTotal * 100) : 0;
   const blockingJob = conversion !== null && jobKind !== 'export';
   const locationName = currentCollection ? currentCollection.name : view === 'continue' ? t('Continue watching') : view === 'favorites' ? t('Favorites') : t('All videos');
@@ -1070,7 +1070,7 @@ export default function App() {
           <div className="video-surface" inert={controlsLocked}>
             {source && <video key={source} ref={videoRef} src={source} playsInline preload={engine === 'live' ? 'auto' : 'metadata'} muted={muted} loop={prefs.repeat==='one' && !(looping && ab.b!==null) && engine === 'direct'} data-zoomed={videoZoom>1?'' : undefined} style={{transform:`translate(${videoPan.x}px, ${videoPan.y}px) scale(${videoZoom})`}} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick} onWheel={handleVideoWheel} onPointerDown={startVideoPan} onPointerMove={moveVideoPan} onPointerUp={endVideoPan} onPointerCancel={endVideoPan} onLoadedMetadata={loaded} onPlay={()=>setPlaying(true)} onPause={()=>{setPlaying(false);saveProgress();}} onWaiting={()=>setLoading(true)} onPlaying={()=>setLoading(false)} onCanPlay={()=>setLoading(false)} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} onError={handleVideoError}>{subtitle?.url && <track key={subtitle.url} kind="subtitles" src={subtitle.url} srcLang="ja" label={subtitle.name} default onLoad={shiftCues}/>}</video>}
             {loading && !error && !blockingJob && <div className="loading-overlay" role="status"><Loader2 size={28} className="spin"/><span className="sr-only">{t('Loading…')}</span></div>}
-            {blockingJob && !error && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>{jobKind === 'prepare' ? t('Preparing smooth playback') : t('Creating optimized copy')} · {conversionTotal ? `${Math.round(jobPercent)}%` : timeLabel(conversion ?? 0)}</span><progress className="job-progress" max={100} value={jobPercent}/><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>{t('Cancel')}</button></div>}
+            {blockingJob && !error && <div className="cut-progress" role="status"><Loader2 size={28} className="spin"/><span>{t('Creating playback copy')} · {conversionTotal ? `${Math.round(jobPercent)}%` : timeLabel(conversion ?? 0)}</span><progress className="job-progress" max={100} value={jobPercent}/><button className="secondary-button" onClick={() => void window.videe?.cancelConversion()}>{t('Cancel')}</button></div>}
             {osd && <div className="player-osd" role="status" aria-live="polite">{osd}</div>}
             {error && <div className="player-error"><Film size={28} aria-hidden="true"/><h2>{t('Can’t play')}</h2>
               <p>{active.native ? t('Convert to a supported format.') : t('This format isn’t supported.')}</p>
@@ -1171,7 +1171,7 @@ export default function App() {
       {window.videe && <>
         <label className="setting-row"><span>{t('Smooth playback')}<small>{t('Converts unusual codecs, interlaced and stuttering videos on the fly.')}</small></span><select aria-label={t('Smooth playback')} value={prefs.smooth} onChange={e=>setPrefs({...prefs,smooth:e.target.value as Preferences['smooth']})}><option value="auto">{t('Automatic')}</option><option value="off">{t('Original only')}</option></select></label>
         <label className="setting-row"><span>{t('Hardware acceleration')}<small>{t('Use the GPU to decode and convert video.')}</small></span><input type="checkbox" role="switch" aria-label={t('Hardware acceleration')} checked={prefs.hardware} onChange={e => setPrefs({...prefs,hardware:e.target.checked})}/></label>
-        <div className="setting-row"><span>{t('Optimized copies')}<small>{cacheBytes === null ? t('Checking…') : cacheBytes ? t('{size} used', { size: sizeLabel(cacheBytes) }) : t('None')}</small></span><button className="secondary-button" disabled={!cacheBytes} onClick={() => void window.videe?.clearCache().then(result => { setCacheBytes(0); notify(t('Freed {size}.', { size: sizeLabel(result.freed) })); }).catch(() => notify(t('Could not clear optimized copies.')))}>{t('Clear')}</button></div>
+        <div className="setting-row"><span>{t('Playback copies')}<small>{cacheBytes === null ? t('Checking…') : cacheBytes ? t('{size} used', { size: sizeLabel(cacheBytes) }) : t('None')}</small></span><button className="secondary-button" disabled={!cacheBytes} onClick={() => void window.videe?.clearCache().then(result => { setCacheBytes(0); notify(t('Freed {size}.', { size: sizeLabel(result.freed) })); }).catch(() => notify(t('Could not clear playback copies.')))}>{t('Clear')}</button></div>
       </>}
       </div></section>
       {window.videe && <section className="settings-section" aria-label={t('Video diagnostics')}><h3>{t('Video diagnostics')}</h3><div className="settings-group"><div className="setting-row"><span>{t('Video decoding')}<small>{gpuStatus ? gpuStatusLabel(gpuStatus.videoDecode) : t('Checking graphics support…')}</small></span><button className="secondary-button" disabled={gpuLoading} onClick={() => void refreshGpuStatus()}>{gpuLoading ? t('Checking…') : t('Refresh')}</button></div>{gpuStatus && <div className="diagnostic-details"><span>{t('GPU compositing: {status}', { status: gpuStatusLabel(gpuStatus.gpuCompositing) })}</span><span>{t('Rasterization: {status}', { status: gpuStatusLabel(gpuStatus.rasterization) })}</span>{gpuStatus.encoder && <span>{t('Conversion engine: {name}', { name: ENCODER_NAMES[gpuStatus.encoder] || gpuStatus.encoder })}</span>}</div>}</div>{window.videe.platform === 'win32' && <p className="setting-note">{t('If video decoding falls back to software, update the graphics driver or select the high-performance GPU in Windows.')}</p>}</section>}
@@ -1191,7 +1191,7 @@ export default function App() {
       <p className="delete-filename">{active.name}</p>
       {analysis ? <>
         <dl className="info-list">
-          <div><dt>{t('Playback')}</dt><dd>{engine === 'live' ? `${t('Smooth playback')} · ${ENCODER_NAMES[gpuStatus?.encoder || ''] || t('live conversion')}` : analysis.converted === 'optimized' ? t('Optimized copy') : analysis.converted === 'edited' ? t('Edited copy') : t('Direct')}</dd></div>
+          <div><dt>{t('Playback')}</dt><dd>{engine === 'live' ? `${t('Smooth playback')} · ${ENCODER_NAMES[gpuStatus?.encoder || ''] || t('live conversion')}` : analysis.converted === 'optimized' ? t('Playback copy') : analysis.converted === 'edited' ? t('Edited copy') : t('Direct')}</dd></div>
           <div><dt>{t('Format')}</dt><dd>{codecLabel(analysis.info) || '—'}</dd></div>
           {analysis.info.video && <div><dt>{t('Video')}</dt><dd>{codecName(analysis.info.video.codec)}{analysis.info.video.profile ? ` (${analysis.info.video.profile})` : ''} · {analysis.info.video.width}×{analysis.info.video.height} · {analysis.info.video.pixFmt || '—'}</dd></div>}
           {analysis.info.audio[0] && <div><dt>{t('Audio')}</dt><dd>{codecName(analysis.info.audio[0].codec)} · {analysis.info.audio[0].channels || '—'}{analysis.info.audio[0].sampleRate ? ` · ${analysis.info.audio[0].sampleRate / 1000} kHz` : ''}</dd></div>}
@@ -1203,8 +1203,8 @@ export default function App() {
         <div className="playback-actions">
           {engine === 'direct' && !analysis.converted && <button type="button" className="secondary-button" onClick={() => { setModal(null); void switchEngine('live', t('Smooth playback on')); }}><Zap size={15} aria-hidden="true"/>{t('Use smooth playback')}</button>}
           {engine === 'live' && <button type="button" className="secondary-button" onClick={() => { setModal(null); void switchEngine('direct', t('Playing original')); }}>{t('Play original')}</button>}
-          {!analysis.converted && <button type="button" className="secondary-button" disabled={conversion !== null} onClick={() => { setModal(null); void convert(analysis.plan.mode === 'remux'); }}>{analysis.plan.mode === 'remux' ? t('Optimize file (lossless)') : t('Create optimized copy')}</button>}
-          {analysis.converted === 'optimized' && <button type="button" className="secondary-button" onClick={() => { setModal(null); void removeOptimized(); }}>{t('Remove optimized copy')}</button>}
+          {!analysis.converted && analysis.plan.mode !== 'remux' && <button type="button" className="secondary-button" disabled={conversion !== null} onClick={() => { setModal(null); void convert(); }}>{t('Create playback copy')}</button>}
+          {analysis.converted === 'optimized' && <button type="button" className="secondary-button" onClick={() => { setModal(null); void removePlaybackCopy(); }}>{t('Remove playback copy')}</button>}
         </div>
       </> : active.native ? <p className="subtle-text">{t('Reading file details…')}</p> : <>
         <dl className="info-list">
