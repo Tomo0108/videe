@@ -377,7 +377,6 @@ app.whenReady().then(async () => {
   });
   register('mpv-set', async (name, value) => { if (mpv) await mpv.set(String(name), value); });
   register('mpv-command', async (name, args) => { if (mpv) return mpv.command(String(name), args); });
-  register('mpv-snapshot', () => mpv ? mpv.snapshot() : null);
   register('mpv-place', rect => {
     if (!mpv) return;
     const box = value => !!value && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(value[key]));

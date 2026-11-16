@@ -8,9 +8,9 @@
 //
 // On Linux the engine can be turned on for tests with VIDEE_MPV=1 and VIDEE_MPV_NODE=<node>
 // (system libmpv, no picture or sound), which is enough to test the control path.
-const { screen, nativeImage } = require('electron');
+const { screen } = require('electron');
 const { join } = require('node:path');
-const { existsSync, promises: fs } = require('node:fs');
+const { existsSync } = require('node:fs');
 const net = require('node:net');
 const { spawn } = require('node:child_process');
 
@@ -103,14 +103,15 @@ class MpvEngine {
       config: 'no', 'load-scripts': 'no', ytdl: 'no', osc: 'no', 'osd-level': '0', terminal: 'no',
       'input-default-bindings': 'no', 'input-vo-keyboard': 'no', 'input-cursor': 'no', 'input-cursor-passthrough': 'yes', 'cursor-autohide': 'no',
       'keep-open': 'yes', idle: 'yes', 'force-window': 'no', 'audio-display': 'no', 'sub-auto': 'no', 'save-position-on-quit': 'no',
-      // In a child window, a flip-model swap chain presents outside the page's composition and tears
-      // like vsync is off. The blit model lets Windows compose it with the page, in step with the display.
-      'gpu-api': 'd3d11', 'd3d11-flip': 'no',
+      // Flip-model D3D11 presentation. The blit model (d3d11-flip=no) avoided tearing only by letting
+      // Windows compose every frame with the page, which made playback judder. The tearing came from
+      // the page repainting under the video each second (frames grabbed for the glass bar), not from flip.
+      'gpu-api': 'd3d11',
       hwdec: 'auto-safe', vo: 'gpu-next', background: 'color', 'background-color': '#000000',
-      'hr-seek': 'yes', 'screenshot-format': 'jpg', 'screenshot-jpeg-quality': '80', 'demuxer-max-bytes': '150MiB', 'sub-visibility': 'no',
+      'hr-seek': 'yes', 'demuxer-max-bytes': '150MiB', 'sub-visibility': 'no',
     };
     // Tests on Linux run mpv without a picture or sound; only the control path is checked there.
-    if (process.platform !== 'win32') { Object.assign(options, { vo: 'null', ao: 'null', hwdec: 'no' }); delete options['gpu-api']; delete options['d3d11-flip']; }
+    if (process.platform !== 'win32') { Object.assign(options, { vo: 'null', ao: 'null', hwdec: 'no' }); delete options['gpu-api']; }
     for (const key of Object.keys(options)) if (options[key] === '') delete options[key];
     // Electron runs the host as plain Node. Linux tests use a separate Node (VIDEE_MPV_NODE), since
     // there libmpv's FFmpeg would clash with the one Electron loads.
@@ -226,25 +227,6 @@ class MpvEngine {
     const scale = this.win.webContents.getZoomFactor() * screen.getDisplayMatching(this.win.getBounds()).scaleFactor;
     const px = box => ({ x: Math.round(box.x * scale), y: Math.round(box.y * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale), radius: Math.round((box.radius || 0) * scale) });
     this.child.place({ ...px(rect), holes: (rect.holes || []).map(px) });
-  }
-
-  /**
-   * A small JPEG of the current frame, as a data URL. The page puts it behind the control bar,
-   * whose frosted glass then blurs the picture as it does over a <video>. The temporary file is
-   * overwritten each time and removed right after it's read.
-   */
-  async snapshot() {
-    if (this.shooting) return null;
-    this.shooting = true;
-    const file = join(require('node:os').tmpdir(), `videe-mpv-${process.pid}.jpg`);
-    try {
-      await this.raw(['screenshot-to-file', file, 'video']);
-      const image = nativeImage.createFromBuffer(await fs.readFile(file));
-      if (image.isEmpty()) return null;
-      const { width } = image.getSize();
-      return `data:image/jpeg;base64,${(width > 640 ? image.resize({ width: 640, quality: 'good' }) : image).toJPEG(70).toString('base64')}`;
-    } catch { return null; }
-    finally { this.shooting = false; fs.rm(file, { force: true }).catch(() => {}); }
   }
 
   async stop() {

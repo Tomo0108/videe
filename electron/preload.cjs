@@ -15,7 +15,6 @@ contextBridge.exposeInMainWorld('videe', {
     set: (name, value) => ipcRenderer.invoke('mpv-set', name, value),
     command: (name, args) => ipcRenderer.invoke('mpv-command', name, args),
     place: rect => ipcRenderer.invoke('mpv-place', rect),
-    snapshot: () => ipcRenderer.invoke('mpv-snapshot'),
     stop: () => ipcRenderer.invoke('mpv-stop'),
     onEvent: callback => { const handler = (_event, value) => callback(value); ipcRenderer.on('mpv-event', handler); return () => ipcRenderer.removeListener('mpv-event', handler); },
   },
