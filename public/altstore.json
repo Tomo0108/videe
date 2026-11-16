@@ -19,20 +19,22 @@
           "NSDocumentsFolderUsageDescription": "このデバイスに保存された動画ファイルを Videe で開くために使います。"
         }
       },
-      "version": "0.1.5",
-      "versionDate": "2026-09-13T15:56:21Z",
-      "versionDescription": "Bulk library removal, nested folder import, and deleting a folder also removes its videos.",
-      "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.5/Videe-0.1.5-ios.ipa",
-      "size": 10980884,
+      "version": "0.1.23",
+      "buildVersion": "123",
+      "versionDate": "2026-11-16T04:44:25Z",
+      "versionDescription": "Installs again from AltStore Classic: the iOS app now carries its real version number, and the AltStore source lists the photo and file permissions it uses.",
+      "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.23/Videe-0.1.23-ios.ipa",
+      "size": 10439976,
       "versions": [
         {
-          "version": "0.1.5",
-          "date": "2026-09-13T15:56:21Z",
-          "localizedDescription": "Bulk library removal, nested folder import, and deleting a folder also removes its videos.",
-          "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.5/Videe-0.1.5-ios.ipa",
-          "size": 10980884,
+          "version": "0.1.23",
+          "buildVersion": "123",
+          "date": "2026-11-16T04:44:25Z",
+          "localizedDescription": "Installs again from AltStore Classic: the iOS app now carries its real version number, and the AltStore source lists the photo and file permissions it uses.",
+          "downloadURL": "https://github.com/Tomo0108/videe/releases/download/v0.1.23/Videe-0.1.23-ios.ipa",
+          "size": 10439976,
           "minOSVersion": "15.0",
-          "sha256": "803ade0d329ab4d0b8ad1b9d094238f3aa34eb282b3cdbfd9584ffb363a1b29b"
+          "sha256": "17622013cc06c77400f5c0c09858a1343fe13b142f976402413951034cfb41de"
         }
       ]
     }
