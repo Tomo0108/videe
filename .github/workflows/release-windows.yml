@@ -20,6 +20,8 @@ jobs:
       - run: npm run test:fixtures
       - run: npm test
       - run: npm run package:win
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Record build provenance
         shell: pwsh
         run: |

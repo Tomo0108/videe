@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import type { MediaItem } from './store';
+import type { MpvBridge } from './mpv-media';
 export type MediaInfo = {
   format: string; duration: number; start: number; bitrate: number; subtitles: number;
   video: null | { codec: string; profile: string; pixFmt: string; width: number; height: number; fps: number; interlaced: boolean; bitDepth: number; chroma: string; rotation: number };
@@ -18,8 +19,9 @@ declare global {
       importFiles(files: File[]): Promise<MediaItem[]>;
       getSource(id: string): Promise<string>;
       analyzeVideo(id: string): Promise<Analysis>;
-      liveSource(id: string, start: number, hardware?: boolean, copy?: boolean): Promise<string>;
+      liveSource(id: string, start: number, hardware?: boolean): Promise<string>;
       stopLive(): Promise<void>;
+      mpv?: MpvBridge;
       useOriginal(id: string): Promise<void>;
       thumbnail(id: string): Promise<{ thumbnail: string; duration: number }>;
       filmstrip(id: string, count: number): Promise<(string | null)[]>;

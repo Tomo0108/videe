@@ -4,6 +4,7 @@ const { basename, dirname, extname, isAbsolute, join } = require('node:path');
 const { existsSync, readFileSync } = require('node:fs');
 const { PassThrough, Readable } = require('node:stream');
 const { mediaResponse } = require('./media-response.cjs');
+const { MpvEngine } = require('./mpv.cjs');
 const { collectVideoPaths, folderGroupName, openablePaths } = require('./folder.cjs');
 const fs = require('node:fs/promises');
 const { randomUUID } = require('node:crypto');
@@ -15,6 +16,21 @@ const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 let win, registry = {}, processJob, registryFile, cacheDir, liveJob;
 let writeQueue = Promise.resolve();
+// Embedded mpv (Windows): started on first use, one per window.
+let mpv, mpvStarting;
+const mpvEnabled = () => process.env.VIDEE_MPV !== '0' && MpvEngine.available();
+function sendMpv(event) { if (win && !win.isDestroyed()) win.webContents.send('mpv-event', event); }
+function mpvEngine() {
+  if (mpv) return Promise.resolve(mpv);
+  return (mpvStarting ||= (async () => {
+    const engine = new MpvEngine(win, sendMpv);
+    engine.onExit = () => { if (mpv === engine) mpv = undefined; };
+    try { await engine.start(); } catch (error) { engine.destroy(); throw error; } finally { mpvStarting = undefined; }
+    mpv = engine;
+    return engine;
+  })());
+}
+function stopMpv() { if (mpv) { mpv.destroy(); mpv = undefined; } }
 let mediaModule;
 const media = () => (mediaModule ||= import('../src/media.mjs'));
 // Writes are coalesced: changes made while a write is waiting to start ride along with it,
@@ -133,7 +149,7 @@ async function analyzeNow(id, read = ffmpegProbe) {
 // byte range) are refused so they can't kill the stream that is playing now.
 let liveToken = '', liveCounter = 0;
 function stopLive() { if (liveJob) { liveJob.stopped = true; liveJob.child?.kill('SIGKILL'); liveJob = undefined; } }
-async function liveResponse(request, id, start, hardware, token, copy = false) {
+async function liveResponse(request, id, start, hardware, token) {
   const entry = registry[id];
   if (!entry) return new Response('Not found', { status: 404 });
   const range = /^bytes=(\d+)-/.exec(request.headers.get('range') || '');
@@ -142,8 +158,8 @@ async function liveResponse(request, id, start, hardware, token, copy = false) {
   await fs.access(input);
   const { liveArgs } = await media();
   const { value } = entry.probe || {};
-  const { info, plan } = value || await analyze(id);
-  const encoder = copy ? 'copy' : hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
+  const info = value?.info || (await analyze(id)).info;
+  const encoder = hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
   // A newer seek may have arrived while the file was being checked.
   if (token !== liveToken || request.signal.aborted) return new Response('Stream replaced', { status: 410 });
   stopLive();
@@ -152,14 +168,14 @@ async function liveResponse(request, id, start, hardware, token, copy = false) {
   liveJob = job;
   const run = encoder => {
     let sent = false;
-    const child = spawn(ffmpegBinary(), liveArgs(input, start, info, encoder, plan), { windowsHide: true });
+    const child = spawn(ffmpegBinary(), liveArgs(input, start, info, encoder), { windowsHide: true });
     job.child = child;
     child.stdout.on('data', chunk => { sent = true; if (!out.write(chunk)) { child.stdout.pause(); out.once('drain', () => child.stdout.resume()); } });
     child.stderr.resume();
     child.on('error', () => out.destroy(new Error('Could not start the playback engine.')));
     child.on('close', code => {
       if (job.stopped) { out.destroy(); return; }
-      if (code !== 0 && !sent && encoder !== 'libx264' && encoder !== 'copy') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
+      if (code !== 0 && !sent && encoder !== 'libx264') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
       out.end();
     });
   };
@@ -168,21 +184,6 @@ async function liveResponse(request, id, start, hardware, token, copy = false) {
   request.signal.addEventListener('abort', stop, { once: true });
   out.on('close', () => request.signal.removeEventListener('abort', stop));
   return new Response(Readable.toWeb(out), { status: 200, headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
-}
-/** The keyframe a copy stream from `start` begins at, so the player knows where it really is. */
-async function copyStart(input, start) {
-  if (!(start > 0)) return 0;
-  const { keyframeProbeArgs, keyframeStart } = await media();
-  const text = await new Promise(resolve => {
-    const child = spawn(ffmpegBinary(), keyframeProbeArgs(input, start), { windowsHide: true });
-    let out = '';
-    const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
-    child.stdout.on('data', data => { if (out.length < 4000) out += data; });
-    child.stderr.resume();
-    child.on('error', () => { clearTimeout(timer); resolve(''); });
-    child.on('close', () => { clearTimeout(timer); resolve(out); });
-  });
-  return keyframeStart(text, start);
 }
 function frameArgs(input, time, filter, codec) {
   return ['-hide_banner', '-nostdin', '-loglevel', 'error', ...(time > 0 ? ['-ss', Number(time).toFixed(3)] : []), '-i', input, '-map', '0:V:0?', '-frames:v', '1', ...(filter ? ['-vf', filter] : []), '-f', 'image2pipe', '-c:v', codec, ...(codec === 'mjpeg' ? ['-q:v', '5'] : []), 'pipe:1'];
@@ -260,7 +261,8 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
   win.webContents.on('did-start-loading', () => { rendererReady = false; });
-  win.on('closed', () => { rendererReady = false; });
+  win.on('closed', () => { rendererReady = false; stopMpv(); });
+  win.webContents.on('did-start-loading', () => { void mpv?.stop(); });
   // VIDEE_LANG=en|ja starts the player in that language (tests and screenshots use it).
   const lang = i18n.normalizeLanguage(process.env.VIDEE_LANG);
   if (process.argv.includes('--dev')) win.loadURL(`http://127.0.0.1:5173${lang ? `?lang=${lang}` : ''}`); else win.loadFile(playerHtml(), lang ? { query: { lang } } : undefined);
@@ -314,7 +316,7 @@ app.whenReady().then(async () => {
   protocol.handle('videe', async request => {
     const url = new URL(request.url); const id = url.pathname.slice(1); const entry = registry[id];
     if (url.hostname === 'live' && entry) {
-      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0', `${id}:${url.searchParams.get('n')}`, url.searchParams.get('c') === '1'); } catch { return new Response('File unavailable', { status: 404 }); }
+      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0', `${id}:${url.searchParams.get('n')}`); } catch { return new Response('File unavailable', { status: 404 }); }
     }
     if (url.hostname !== 'media' || !entry) return new Response('Not found', { status: 404 });
     try { return await mediaResponse(request, entry.converted || entry.path); } catch { return new Response('File unavailable', { status: 404 }); }
@@ -353,18 +355,28 @@ app.whenReady().then(async () => {
   register('take-opened-files', async () => { rendererReady = true; const files = openQueue.splice(0); return files.length ? importPaths(files) : []; });
   register('get-source', async id => { const entry = registry[id]; if (!entry) throw new Error('File not found. Please add it again.'); await fs.access(entry.converted || entry.path); return `videe://media/${id}`; });
   register('analyze-video', async id => analyze(id));
-  // `copy` repackages without re-encoding (files whose codecs play natively but whose container
-  // doesn't). Such a stream starts at a keyframe; `k` tells the player where that is.
-  register('live-source', async (id, start, hardware = true, copy = false) => {
+  register('live-source', async (id, start, hardware = true) => {
     const entry = registry[id];
     if (!entry) throw new Error('File not found. Please add it again.');
     await fs.access(entry.path);
-    const at = Math.max(0, Number(start) || 0);
     const n = `${Date.now()}-${++liveCounter}`; liveToken = `${id}:${n}`;
-    const k = copy ? await copyStart(entry.path, at) : at;
-    return `videe://live/${id}?t=${at.toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}${copy ? `&c=1&k=${k.toFixed(3)}` : ''}`;
+    return `videe://live/${id}?t=${Math.max(0, Number(start) || 0).toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
+  register('mpv-available', () => mpvEnabled());
+  register('mpv-open', async (id, options) => {
+    const entry = registry[id];
+    if (!entry) throw new Error('File not found. Please add it again.');
+    const input = entry.converted && entry.convertedKind === 'edited' ? entry.converted : entry.path;
+    await fs.access(input);
+    stopLive();
+    const engine = await mpvEngine();
+    await engine.open(input, options && typeof options === 'object' ? options : {});
+  });
+  register('mpv-set', async (name, value) => { if (mpv) await mpv.set(String(name), value); });
+  register('mpv-command', async (name, args) => { if (mpv) return mpv.command(String(name), args); });
+  register('mpv-place', rect => { if (!mpv) return; const ok = rect && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(rect[key])); mpv.place(ok ? rect : null); });
+  register('mpv-stop', async () => { await mpv?.stop(); });
   register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
   register('set-language', async value => {
     if (!i18n.setLanguage(value)) return;
@@ -560,5 +572,5 @@ app.whenReady().then(async () => {
   setTimeout(() => { void hardwareEncoder(); }, 1500);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => { processJob?.child?.kill('SIGTERM'); stopLive(); });
+app.on('before-quit', () => { processJob?.child?.kill('SIGTERM'); stopLive(); stopMpv(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

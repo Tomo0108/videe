@@ -15,7 +15,7 @@
     "desktop:dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron . --dev\"",
     "package:mac": "node scripts/check-platform.mjs darwin && npm run build && node scripts/ensure-player-index.mjs && electron-builder --mac --dir --publish never",
     "package:mac:dmg": "node scripts/check-platform.mjs darwin && npm run build && node scripts/ensure-player-index.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --publish never",
-    "package:win": "node scripts/check-platform.mjs win32 && npm run build && node scripts/ensure-player-index.mjs && electron-builder --win nsis --publish never",
+    "package:win": "node scripts/check-platform.mjs win32 && node scripts/fetch-mpv.mjs && npm run build && node scripts/ensure-player-index.mjs && electron-builder --win nsis --publish never",
     "package:ios": "node scripts/package-ios.mjs",
     "ios:sync": "npm run build && node scripts/ensure-player-index.mjs && cap sync ios",
     "ios:open": "cap open ios",
@@ -23,7 +23,7 @@
     "test:fixtures": "node scripts/create-fixtures.mjs",
     "test:browser": "node scripts/verify-browser.mjs",
     "test:desktop": "node scripts/verify-desktop.mjs",
-    "test:remux": "node scripts/verify-remux-stream.mjs",
+    "test:mpv": "node scripts/verify-mpv.mjs",
     "ios:build": "npm run ios:sync && xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath /tmp/videe-ios-build CODE_SIGNING_ALLOWED=NO build",
     "test:library": "node scripts/verify-library.mjs",
     "icons:build": "node scripts/build-icons.mjs",
@@ -56,7 +56,9 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/ffmpeg-static/**"
+      "node_modules/ffmpeg-static/**",
+      "node_modules/koffi/**",
+      "node_modules/@koromix/**"
     ],
     "fileAssociations": [
       {
@@ -107,6 +109,12 @@
     },
     "win": {
       "icon": "public/icons/Videe.ico",
+      "extraResources": [
+        {
+          "from": "vendor/mpv",
+          "to": "mpv"
+        }
+      ],
       "target": [
         "nsis"
       ],
@@ -124,6 +132,7 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/inter-tight": "^5.3.0",
     "ffmpeg-static": "^5.3.0",
+    "koffi": "^3.3.8",
     "lucide-react": "^1.43.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

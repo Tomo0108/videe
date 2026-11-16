@@ -9,3 +9,4 @@ ios/App/App/public/
 ios/App/Pods/
 tests/fixtures/*.mp4
 tests/fixtures/*.avi
+vendor/
