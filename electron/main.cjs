@@ -127,75 +127,13 @@ async function analyzeNow(id, read = ffmpegProbe) {
   return value;
 }
 
-// Background preparation: files whose codecs play natively but whose container or audio doesn't
-// (MKV, AVI, AC-3/DTS audio…) get a lossless MP4 copy in the cache ahead of time, one at a time at
-// low priority, so opening them later plays directly with instant seeking and no waiting.
-const PREPARE_LIMIT = 2 * 1024 ** 3;
-let prepareEnabled = false, prepareJob, prepareRunning = false, prepareScanned = false;
-const prepareQueue = [];
-function sendPrepared(id) { if (win && !win.isDestroyed()) win.webContents.send('video-prepared', id); }
-function queuePrepare(ids, { front = false } = {}) {
-  for (const id of ids) {
-    const index = prepareQueue.indexOf(id);
-    if (index >= 0) { if (!front) continue; prepareQueue.splice(index, 1); }
-    if (front) prepareQueue.unshift(id); else prepareQueue.push(id);
-  }
-  void runPrepareQueue();
-}
-function cancelPrepare(id) {
-  const index = prepareQueue.indexOf(id);
-  if (index >= 0) prepareQueue.splice(index, 1);
-  if (prepareJob && (id === undefined || prepareJob.id === id)) { prepareJob.cancelled = true; prepareJob.child?.kill('SIGTERM'); }
-}
-async function enoughSpace(bytes) {
-  try { const stat = await fs.statfs(cacheDir); return stat.bavail * stat.bsize > bytes * 1.2 + 2 * 1024 ** 3; } catch { return true; }
-}
-async function prepareOne(id) {
-  const entry = registry[id];
-  if (!entry || entry.converted || entry.manualOnly || processJob?.id === id) return;
-  try { await fs.access(entry.path); } catch { return; }
-  const { info, plan, known, size } = await analyze(id);
-  if (!known || plan.mode !== 'remux' || size > PREPARE_LIMIT || !(await enoughSpace(size))) return;
-  const { remuxArgs } = await media();
-  const output = join(cacheDir, `${id}.mp4`);
-  const temp = join(cacheDir, `${id}.prepare.partial.mp4`);
-  const job = { id, cancelled: false, child: undefined };
-  prepareJob = job;
-  const ok = await new Promise(resolve => {
-    const child = spawn(ffmpegBinary(), ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', ...remuxArgs(entry.path, plan, info), '-movflags', '+faststart', temp], { windowsHide: true });
-    job.child = child;
-    try { if (child.pid) require('node:os').setPriority(child.pid, 10); } catch { /* Keeps normal priority. */ }
-    child.stderr.resume();
-    child.on('error', () => resolve(false));
-    child.on('close', code => resolve(code === 0 && !job.cancelled));
-  });
-  if (prepareJob === job) prepareJob = undefined;
-  // The video may have been removed, converted or edited while the copy was being written.
-  if (!ok || registry[id] !== entry || entry.converted || processJob?.id === id) { await fs.rm(temp, { force: true }).catch(() => {}); return; }
-  try {
-    await fs.rename(temp, output);
-    entry.converted = output; entry.convertedKind = 'optimized'; delete entry.probe; await persist();
-    sendPrepared(id);
-  } catch { await fs.rm(temp, { force: true }).catch(() => {}); }
-}
-async function runPrepareQueue() {
-  if (prepareRunning || !prepareEnabled || !cacheDir) return;
-  prepareRunning = true;
-  try {
-    while (prepareEnabled && prepareQueue.length) {
-      const id = prepareQueue.shift();
-      try { await prepareOne(id); } catch { /* Unreadable files keep playing through live conversion. */ }
-    }
-  } finally { prepareRunning = false; }
-}
-
 // Live playback: ffmpeg transcodes from any position straight into the player as fragmented MP4.
 // Only the most recent stream handed to the renderer may run. Requests for older streams
 // (players that were replaced while seeking, or Chromium retrying a broken stream with a
 // byte range) are refused so they can't kill the stream that is playing now.
 let liveToken = '', liveCounter = 0;
 function stopLive() { if (liveJob) { liveJob.stopped = true; liveJob.child?.kill('SIGKILL'); liveJob = undefined; } }
-async function liveResponse(request, id, start, hardware, token) {
+async function liveResponse(request, id, start, hardware, token, copy = false) {
   const entry = registry[id];
   if (!entry) return new Response('Not found', { status: 404 });
   const range = /^bytes=(\d+)-/.exec(request.headers.get('range') || '');
@@ -204,8 +142,8 @@ async function liveResponse(request, id, start, hardware, token) {
   await fs.access(input);
   const { liveArgs } = await media();
   const { value } = entry.probe || {};
-  const info = value?.info || (await analyze(id)).info;
-  const encoder = hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
+  const { info, plan } = value || await analyze(id);
+  const encoder = copy ? 'copy' : hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
   // A newer seek may have arrived while the file was being checked.
   if (token !== liveToken || request.signal.aborted) return new Response('Stream replaced', { status: 410 });
   stopLive();
@@ -214,14 +152,14 @@ async function liveResponse(request, id, start, hardware, token) {
   liveJob = job;
   const run = encoder => {
     let sent = false;
-    const child = spawn(ffmpegBinary(), liveArgs(input, start, info, encoder), { windowsHide: true });
+    const child = spawn(ffmpegBinary(), liveArgs(input, start, info, encoder, plan), { windowsHide: true });
     job.child = child;
     child.stdout.on('data', chunk => { sent = true; if (!out.write(chunk)) { child.stdout.pause(); out.once('drain', () => child.stdout.resume()); } });
     child.stderr.resume();
     child.on('error', () => out.destroy(new Error('Could not start the playback engine.')));
     child.on('close', code => {
       if (job.stopped) { out.destroy(); return; }
-      if (code !== 0 && !sent && encoder !== 'libx264') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
+      if (code !== 0 && !sent && encoder !== 'libx264' && encoder !== 'copy') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
       out.end();
     });
   };
@@ -230,6 +168,21 @@ async function liveResponse(request, id, start, hardware, token) {
   request.signal.addEventListener('abort', stop, { once: true });
   out.on('close', () => request.signal.removeEventListener('abort', stop));
   return new Response(Readable.toWeb(out), { status: 200, headers: { 'Content-Type': 'video/mp4', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' } });
+}
+/** The keyframe a copy stream from `start` begins at, so the player knows where it really is. */
+async function copyStart(input, start) {
+  if (!(start > 0)) return 0;
+  const { keyframeProbeArgs, keyframeStart } = await media();
+  const text = await new Promise(resolve => {
+    const child = spawn(ffmpegBinary(), keyframeProbeArgs(input, start), { windowsHide: true });
+    let out = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+    child.stdout.on('data', data => { if (out.length < 4000) out += data; });
+    child.stderr.resume();
+    child.on('error', () => { clearTimeout(timer); resolve(''); });
+    child.on('close', () => { clearTimeout(timer); resolve(out); });
+  });
+  return keyframeStart(text, start);
 }
 function frameArgs(input, time, filter, codec) {
   return ['-hide_banner', '-nostdin', '-loglevel', 'error', ...(time > 0 ? ['-ss', Number(time).toFixed(3)] : []), '-i', input, '-map', '0:V:0?', '-frames:v', '1', ...(filter ? ['-vf', filter] : []), '-f', 'image2pipe', '-c:v', codec, ...(codec === 'mjpeg' ? ['-q:v', '5'] : []), 'pipe:1'];
@@ -292,9 +245,7 @@ async function importPaths(filePaths) {
     const id = ids.get(file) || randomUUID(); registry[id] ||= { path: file }; ids.set(file, id);
     records.push({ id, name: basename(file), size: stat.size, native: true, type: '', added, duration: 0, position: 0, favorite: false, lastPlayed: 0 });
   }
-  await persist();
-  queuePrepare(records.map(record => record.id));
-  return records;
+  await persist(); return records;
 }
 let languageFile = '';
 /** Mac menu bar in the app language. Windows keeps Electron's hidden default menu and its shortcuts. */
@@ -363,7 +314,7 @@ app.whenReady().then(async () => {
   protocol.handle('videe', async request => {
     const url = new URL(request.url); const id = url.pathname.slice(1); const entry = registry[id];
     if (url.hostname === 'live' && entry) {
-      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0', `${id}:${url.searchParams.get('n')}`); } catch { return new Response('File unavailable', { status: 404 }); }
+      try { return await liveResponse(request, id, Number(url.searchParams.get('t')) || 0, url.searchParams.get('hw') !== '0', `${id}:${url.searchParams.get('n')}`, url.searchParams.get('c') === '1'); } catch { return new Response('File unavailable', { status: 404 }); }
     }
     if (url.hostname !== 'media' || !entry) return new Response('Not found', { status: 404 });
     try { return await mediaResponse(request, entry.converted || entry.path); } catch { return new Response('File unavailable', { status: 404 }); }
@@ -402,15 +353,19 @@ app.whenReady().then(async () => {
   register('take-opened-files', async () => { rendererReady = true; const files = openQueue.splice(0); return files.length ? importPaths(files) : []; });
   register('get-source', async id => { const entry = registry[id]; if (!entry) throw new Error('File not found. Please add it again.'); await fs.access(entry.converted || entry.path); return `videe://media/${id}`; });
   register('analyze-video', async id => analyze(id));
-  register('live-source', async (id, start, hardware = true) => {
+  // `copy` repackages without re-encoding (files whose codecs play natively but whose container
+  // doesn't). Such a stream starts at a keyframe; `k` tells the player where that is.
+  register('live-source', async (id, start, hardware = true, copy = false) => {
     const entry = registry[id];
     if (!entry) throw new Error('File not found. Please add it again.');
     await fs.access(entry.path);
+    const at = Math.max(0, Number(start) || 0);
     const n = `${Date.now()}-${++liveCounter}`; liveToken = `${id}:${n}`;
-    return `videe://live/${id}?t=${Math.max(0, Number(start) || 0).toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
+    const k = copy ? await copyStart(entry.path, at) : at;
+    return `videe://live/${id}?t=${at.toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}${copy ? `&c=1&k=${k.toFixed(3)}` : ''}`;
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
-  register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); cancelPrepare(id); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
+  register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
   register('set-language', async value => {
     if (!i18n.setLanguage(value)) return;
     buildMenu();
@@ -419,27 +374,19 @@ app.whenReady().then(async () => {
   register('cancel-conversion', () => { if (processJob) { processJob.cancelled = true; processJob.child?.kill('SIGTERM'); } });
   register('convert-video', async id => {
     if (!registry[id]) throw new Error('Video not found.');
-    stopLive(); cancelPrepare(id);
+    stopLive();
     return withJob(id, async () => {
       await fs.access(ffmpegBinary());
       const result = await runEncode(id, ['-i', registry[id].path, '-map', '0:V:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-vf', 'bwdif=mode=send_frame:deint=interlaced,scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:a', 'aac', '-b:a', '192k']);
       return result.src;
     });
   });
-  // Opening a video that isn't prepared yet moves it to the front of the background queue.
-  register('prepare-video', async id => { const entry = registry[id]; if (!entry || entry.converted) return; delete entry.manualOnly; queuePrepare([id], { front: true }); });
-  register('set-auto-prepare', async enabled => {
-    prepareEnabled = !!enabled;
-    if (!prepareEnabled) { cancelPrepare(); return; }
-    if (!prepareScanned) { prepareScanned = true; queuePrepare(Object.keys(registry)); } else void runPrepareQueue();
-  });
   register('use-original', async id => {
     const entry = registry[id];
-    if (entry) { cancelPrepare(id); entry.manualOnly = true; }
-    if (!entry?.converted) { void persist(); return; }
+    if (!entry?.converted) return;
     if (processJob?.id === id) throw new Error('Wait for the current task to finish.');
     await fs.rm(entry.converted, { force: true });
-    delete entry.converted; delete entry.convertedKind; delete entry.probe; entry.manualOnly = true; await persist();
+    delete entry.converted; delete entry.convertedKind; delete entry.probe; await persist();
   });
   register('thumbnail', async id => {
     const entry = registry[id];
@@ -514,7 +461,7 @@ app.whenReady().then(async () => {
       output = result.filePath;
     }
     if (output === entry.path) throw new Error('Choose a different file name. The original stays untouched.');
-    stopLive(); cancelPrepare(id);
+    stopLive();
     const temp = join(dirname(output), `.videe-${randomUUID()}.partial.${ext}`);
     const work = join(cacheDir, `export-${randomUUID()}`);
     try {
@@ -568,14 +515,11 @@ app.whenReady().then(async () => {
   });
   register('clear-cache', async () => {
     let freed = 0;
-    cancelPrepare(); prepareQueue.length = 0;
     for (const [id, entry] of Object.entries(registry)) {
       if (!entry.converted || entry.convertedKind === 'edited' || processJob?.id === id) continue;
       try { freed += (await fs.stat(entry.converted)).size; } catch { /* Already removed. */ }
       await fs.rm(entry.converted, { force: true });
       delete entry.converted; delete entry.convertedKind; delete entry.probe;
-      // Cleared copies come back only when the video is opened again, so the space stays free.
-      entry.manualOnly = true;
     }
     await persist();
     return { freed };
@@ -616,5 +560,5 @@ app.whenReady().then(async () => {
   setTimeout(() => { void hardwareEncoder(); }, 1500);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => { processJob?.child?.kill('SIGTERM'); prepareEnabled = false; cancelPrepare(); stopLive(); });
+app.on('before-quit', () => { processJob?.child?.kill('SIGTERM'); stopLive(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

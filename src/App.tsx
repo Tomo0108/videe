@@ -99,7 +99,7 @@ export default function App() {
   const [isFullscreen,setIsFullscreen] = useState(false);
   const [videoZoom,setVideoZoom] = useState(1); const [videoPan,setVideoPan] = useState({x:0,y:0});
   // Playback engine: direct decoding, or FFmpeg live conversion for formats that stutter or fail.
-  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0);
+  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0); const liveCopy = useRef(false); const liveSkip = useRef(0); const [repackaging,setRepackaging] = useState(false);
   const [analysis,setAnalysis] = useState<Analysis|null>(null); const analysisRef = useRef<Analysis|null>(null);
   const [frameStats,setFrameStats] = useState<{dropped:number;total:number}|null>(null);
   const [osd,setOsd] = useState(''); const osdTimer = useRef(0);
@@ -252,9 +252,13 @@ export default function App() {
     if (!window.videe?.liveSource) return false;
     const sequence = openSequence.current;
     try {
-      const src = await window.videe.liveSource(id, at, prefsRef.current.hardware);
+      const copy = liveCopy.current;
+      const src = await window.videe.liveSource(id, at, prefsRef.current.hardware, copy);
       if (sequence !== openSequence.current || activeRef.current !== id) return false;
-      liveOffset.current = at; engineRef.current = 'live'; setEngine('live');
+      // A repackaged stream starts at the keyframe before `at`; the player skips ahead to `at` once loaded.
+      const keyframe = copy ? Number(new URL(src).searchParams.get('k')) : NaN;
+      const start = Number.isFinite(keyframe) && keyframe <= at ? keyframe : at;
+      liveOffset.current = start; liveSkip.current = at - start > 0.04 ? at - start : 0; engineRef.current = 'live'; setEngine('live'); setRepackaging(copy);
       pendingSeek.current = null; playAfterLoad.current = play; setError(''); setLoading(true); setPosition(at); lastPositionPaint.current = at;
       setSource(src);
       return true;
@@ -286,7 +290,7 @@ export default function App() {
     if(!queue.current.includes(item.id)) queue.current = [...queue.current, item.id];
     saveProgress(); forceResume.current = resumePlayback; playAfterLoad.current = continuePlayback; startFromBeginning.current = continuePlayback; const sequence = ++openSequence.current;
     window.clearTimeout(liveSeekTimer.current); pendingSeek.current = null; seekOnLoad.current = null; firstLoad.current = true; recoveries.current = 0; triedLive.current = false; stopAt.current = null;
-    engineRef.current = 'direct'; liveOffset.current = 0; analysisRef.current = null;
+    engineRef.current = 'direct'; liveOffset.current = 0; liveCopy.current = false; liveSkip.current = 0; analysisRef.current = null;
     setEngine('direct'); setAnalysis(null); setFrameStats(null); setFilmstrip([]); filmstripFor.current = ''; setSegments([]); setSelectedSegment(null); past.current = []; future.current = []; setPreviewEdits(false);
     setAb({a:null,b:null}); setLooping(false); setActiveId(item.id); setSource(''); setPlaying(false); setError(''); setLoading(true); setPosition(0); setDuration(0); setSubtitle(null); setEmbeddedTracks([]); setChrome(true); setVideoZoom(1); setVideoPan({x:0,y:0}); lastSave.current = 0; lastPositionPaint.current = 0;
     try {
@@ -304,9 +308,8 @@ export default function App() {
           if (length > 0) { setDuration(length); durationRef.current = length; }
           const stored = itemsRef.current.find(i => i.id === item.id)?.position || 0;
           const resumeAt = (!startFromBeginning.current || forceResume.current) && (prefsRef.current.resume || forceResume.current) && stored < length - 2 ? stored : 0;
-          // Not prepared in the background yet: play right away through live conversion and
-          // move this file to the front of the queue so it plays directly next time.
-          if (mode === 'remux' && override !== 'live') void window.videe.prepareVideo?.(item.id).catch(() => {});
+          // Codecs the player decodes in a container it can't read: repackage on the fly, no re-encoding, nothing on disk.
+          liveCopy.current = mode === 'remux';
           updateItem(item.id, {lastPlayed: Date.now()});
           await startLive(item.id, resumeAt, continuePlayback);
           loadSubtitles(item, sequence);
@@ -331,11 +334,11 @@ export default function App() {
     } catch(e) { if(sequence === openSequence.current) { setError(errorText(e, 'Could not open this video.')); setLoading(false); } }
   }, [conversion,minimized,notify,saveProgress,updateItem,startLive,loadSubtitles,engineChoice]);
   /** Switch the active video between direct decoding and live conversion, keeping the position. */
-  const switchEngine = useCallback(async (target: Engine, reason = '') => {
+  const switchEngine = useCallback(async (target: Engine, reason = '', copy = false) => {
     const id = activeRef.current; const video = videoRef.current;
     if (!id || !window.videe) return;
     const at = pendingSeek.current ?? now(); const play = !!video && !video.paused;
-    rememberEngine(id, target);
+    rememberEngine(id, target); liveCopy.current = target === 'live' && copy;
     if (target === 'live') { if (await startLive(id, at, play) && reason) showOsd(reason); return; }
     try {
       const src = await window.videe.getSource(id);
@@ -765,18 +768,6 @@ export default function App() {
     }, 2000);
     return () => window.clearInterval(timer);
   }, [playing, engine, active?.id, active?.native, prefs.smooth, minimized, switchEngine]);
-  // Files the player can't open as they are get a playback copy in the background after they're added.
-  useEffect(() => { void Promise.resolve(window.videe?.setAutoPrepare?.(prefs.smooth === 'auto')).catch(() => {}); }, [prefs.smooth]);
-  // A copy finished for the video on screen: refresh its details, and if it is paused on live
-  // conversion, move it to the copy so seeking is instant from here on.
-  useEffect(() => { const off = window.videe?.onVideoPrepared?.(id => {
-    if (id !== activeRef.current || !window.videe) return;
-    void window.videe.analyzeVideo(id).then(refreshed => {
-      if (id !== activeRef.current) return;
-      analysisRef.current = refreshed; setAnalysis(refreshed);
-      if (engineRef.current === 'live' && videoRef.current?.paused && engineChoice(id) !== 'live') void switchEngine('direct').then(() => rememberEngine(id));
-    }).catch(() => {});
-  }); return typeof off === 'function' ? off : undefined; }, [switchEngine, engineChoice, rememberEngine]);
   useEffect(() => {
     if (modal !== 'playback') return;
     const sample = () => { const quality = videoRef.current?.getVideoPlaybackQuality?.(); if (quality) setFrameStats({dropped: quality.droppedVideoFrames, total: quality.totalVideoFrames}); };
@@ -790,7 +781,7 @@ export default function App() {
     const probed = analysisRef.current?.info.duration || 0;
     const finiteDuration = live ? (probed || durationRef.current) : (Number.isFinite(video.duration) ? video.duration : 0);
     setDuration(finiteDuration); durationRef.current = finiteDuration; video.playbackRate = prefs.speed; video.volume = prefs.volume; setLoading(false);
-    if (live) recoveries.current = 0;
+    if (live) { recoveries.current = 0; if (liveSkip.current) { video.currentTime = liveSkip.current; liveSkip.current = 0; } }
     if (finiteDuration) updateItem(activeId,{duration:finiteDuration});
     const stored = itemsRef.current.find(i=>i.id===activeId);
     if (first) {
@@ -825,7 +816,7 @@ export default function App() {
     const at = pendingSeek.current ?? now();
     if (item?.native && window.videe?.liveSource) {
       if (engineRef.current === 'direct' && !triedLive.current && engineChoice(item.id) !== 'direct') { triedLive.current = true; void switchEngine('live', t('Converting video for playback')); return; }
-      if (engineRef.current === 'live' && recoveries.current < 2) { recoveries.current++; void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return; }
+      if (engineRef.current === 'live' && recoveries.current < 2) { recoveries.current++; liveCopy.current = false; void startLive(item.id, at, playAfterLoad.current || !videoRef.current?.paused); return; }
     }
     setLoading(false); setPlaying(false); setError(t('This video format is not supported by this player.'));
   };
@@ -896,7 +887,7 @@ export default function App() {
   const removePlaybackCopy = async () => {
     if (!active?.native || !window.videe?.useOriginal) return;
     const id = active.id;
-    try { await window.videe.useOriginal(id); rememberEngine(id); const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed); await switchEngine(refreshed?.plan.mode === 'direct' ? 'direct' : 'live'); rememberEngine(id); }
+    try { await window.videe.useOriginal(id); rememberEngine(id); const refreshed = await window.videe.analyzeVideo(id).catch(() => null); analysisRef.current = refreshed; setAnalysis(refreshed); await switchEngine(refreshed?.plan.mode === 'direct' ? 'direct' : 'live', '', refreshed?.plan.mode === 'remux'); rememberEngine(id); }
     catch (e) { notify(errorText(e, 'Could not remove the playback copy.')); }
   };
   const removeFromLibrary = async (ids: string[]) => {
@@ -1035,7 +1026,7 @@ export default function App() {
     return () => { media.removeEventListener('change', syncDark); reducedMotion.removeEventListener('change', syncMotion); };
   }, [prefs.theme, prefs.motion]);
   const timeText = (seconds: number) => prefs.timecode ? timecode(seconds, fps) : timeLabel(seconds);
-  const engineLabel = engine === 'live' ? t('Smooth playback') : analysis?.converted === 'edited' ? t('Edited copy') : '';
+  const engineLabel = engine === 'live' && !repackaging ? t('Smooth playback') : analysis?.converted === 'edited' ? t('Edited copy') : '';
   const jobPercent = conversion !== null && conversionTotal ? Math.min(100, conversion / conversionTotal * 100) : 0;
   const blockingJob = conversion !== null && jobKind !== 'export';
   const locationName = currentCollection ? currentCollection.name : view === 'continue' ? t('Continue watching') : view === 'favorites' ? t('Favorites') : t('All videos');
@@ -1191,7 +1182,7 @@ export default function App() {
       <p className="delete-filename">{active.name}</p>
       {analysis ? <>
         <dl className="info-list">
-          <div><dt>{t('Playback')}</dt><dd>{engine === 'live' ? `${t('Smooth playback')} · ${ENCODER_NAMES[gpuStatus?.encoder || ''] || t('live conversion')}` : analysis.converted === 'optimized' ? t('Playback copy') : analysis.converted === 'edited' ? t('Edited copy') : t('Direct')}</dd></div>
+          <div><dt>{t('Playback')}</dt><dd>{engine === 'live' && repackaging ? t('Direct') : engine === 'live' ? `${t('Smooth playback')} · ${ENCODER_NAMES[gpuStatus?.encoder || ''] || t('live conversion')}` : analysis.converted === 'optimized' ? t('Playback copy') : analysis.converted === 'edited' ? t('Edited copy') : t('Direct')}</dd></div>
           <div><dt>{t('Format')}</dt><dd>{codecLabel(analysis.info) || '—'}</dd></div>
           {analysis.info.video && <div><dt>{t('Video')}</dt><dd>{codecName(analysis.info.video.codec)}{analysis.info.video.profile ? ` (${analysis.info.video.profile})` : ''} · {analysis.info.video.width}×{analysis.info.video.height} · {analysis.info.video.pixFmt || '—'}</dd></div>}
           {analysis.info.audio[0] && <div><dt>{t('Audio')}</dt><dd>{codecName(analysis.info.audio[0].codec)} · {analysis.info.audio[0].channels || '—'}{analysis.info.audio[0].sampleRate ? ` · ${analysis.info.audio[0].sampleRate / 1000} kHz` : ''}</dd></div>}

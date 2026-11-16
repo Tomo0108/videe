@@ -223,8 +223,9 @@ export function liveEncoderArgs(encoder, fps = 30) {
  * ffmpeg arguments that stream a fragmented MP4 to stdout from `start` seconds.
  * @param {string} input @param {number} start @param {ReturnType<typeof parseMediaInfo>} info @param {string} encoder
  */
-export function liveArgs(input, start, info, encoder = 'libx264') {
+export function liveArgs(input, start, info, encoder = 'libx264', plan = null) {
   const seek = Math.max(0, Number(start) || 0);
+  if (encoder === 'copy') return copyLiveArgs(input, seek, info, plan);
   return [
     '-hide_banner', '-nostdin', '-loglevel', 'error',
     ...(encoder === 'libx264' ? [] : ['-hwaccel', 'auto']),
@@ -237,6 +238,44 @@ export function liveArgs(input, start, info, encoder = 'libx264') {
     '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '500000',
     'pipe:1',
   ];
+}
+
+/**
+ * Repackage on the fly: the video stream is copied untouched into a fragmented MP4 on stdout, so
+ * MKV, AVI and similar files play without re-encoding and without writing anything to disk.
+ * The stream starts at the keyframe at or before `start` (see `keyframeStart`).
+ */
+export function copyLiveArgs(input, seek, info, plan) {
+  const hevc = info?.video?.codec === 'hevc';
+  const audio = plan?.audio === 'aac' ? ['-c:a', 'aac', '-b:a', '256k'] : ['-c:a', 'copy'];
+  return [
+    '-hide_banner', '-nostdin', '-loglevel', 'error',
+    ...(seek > 0 ? ['-ss', seek.toFixed(3)] : []),
+    '-i', input,
+    '-map', '0:V:0?', '-map', '0:a:0?', '-sn', '-dn',
+    '-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : []),
+    ...audio,
+    '-avoid_negative_ts', 'make_zero',
+    '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '500000',
+    'pipe:1',
+  ];
+}
+
+/** ffmpeg arguments that report the first video packet a copy stream from `seek` seconds would start with. */
+export function keyframeProbeArgs(input, seek) {
+  return ['-hide_banner', '-nostdin', '-loglevel', 'error', ...(seek > 0 ? ['-ss', seek.toFixed(3)] : []), '-i', input, '-map', '0:V:0', '-c', 'copy', '-frames:v', '1', '-f', 'framecrc', '-'];
+}
+
+/** Where (in the file's timeline) a copy stream from `seek` really starts, from `keyframeProbeArgs` output. */
+export function keyframeStart(framecrc, seek) {
+  const text = String(framecrc || '');
+  const base = /^#tb 0: (\d+)\/(\d+)/m.exec(text);
+  const packet = /^0,\s*(-?\d+),\s*(-?\d+),/m.exec(text);
+  if (!base || !packet || !Number(base[2])) return seek;
+  // make_zero shifts the stream so its first decode timestamp is 0, so the player's 0 is this packet's dts.
+  const dts = Number(packet[1]) * Number(base[1]) / Number(base[2]);
+  const start = seek + dts;
+  return Number.isFinite(start) && start <= seek + 0.05 ? Math.max(0, start) : seek;
 }
 
 /** ffmpeg arguments for a stream-copy remux into a seekable MP4. */

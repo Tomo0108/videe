@@ -18,11 +18,8 @@ declare global {
       importFiles(files: File[]): Promise<MediaItem[]>;
       getSource(id: string): Promise<string>;
       analyzeVideo(id: string): Promise<Analysis>;
-      liveSource(id: string, start: number, hardware?: boolean): Promise<string>;
+      liveSource(id: string, start: number, hardware?: boolean, copy?: boolean): Promise<string>;
       stopLive(): Promise<void>;
-      prepareVideo?(id: string): Promise<void>;
-      setAutoPrepare?(enabled: boolean): Promise<void>;
-      onVideoPrepared?(cb: (id: string) => void): () => void;
       useOriginal(id: string): Promise<void>;
       thumbnail(id: string): Promise<{ thumbnail: string; duration: number }>;
       filmstrip(id: string, count: number): Promise<(string | null)[]>;
