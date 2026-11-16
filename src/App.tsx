@@ -814,19 +814,27 @@ export default function App() {
     const measure = () => {
       frame = requestAnimationFrame(measure);
       const surface = mpvSurface.current;
-      let rect: { x: number; y: number; width: number; height: number } | null = null;
+      type Box = { x: number; y: number; width: number; height: number };
+      let rect: (Box & { holes: Box[] }) | null = null;
       if (surface && !mpvBlocked2 && !document.querySelector('dialog[open]')) {
+        // The video window keeps the surface's full size, so showing the controls never resizes the
+        // picture. Bars drawn over it are cut out of the window instead, which lets them show through.
         const r = surface.getBoundingClientRect();
-        let top = Math.max(0, r.top), bottom = Math.min(window.innerHeight, r.bottom);
+        const top = Math.max(0, r.top), bottom = Math.min(window.innerHeight, r.bottom);
         const left = Math.max(0, r.left), right = Math.min(window.innerWidth, r.right);
+        const fullscreenRoot = document.fullscreenElement;
+        const holes: Box[] = [];
         for (const el of [document.querySelector('.app-header'), document.querySelector('.player-controls'), document.querySelector('.mini-controls'), document.querySelector('.editor-panel')]) {
+          // In full screen only the player is drawn; the rest of the page (the header) isn't visible.
+          if (fullscreenRoot && el && !fullscreenRoot.contains(el)) continue;
           const o = visible(el);
           if (!o || o.right <= left || o.left >= right || o.bottom <= top || o.top >= bottom) continue;
-          if (o.top <= top) top = Math.max(top, o.bottom); else bottom = Math.min(bottom, o.top);
+          const x = Math.max(left, o.left), y = Math.max(top, o.top);
+          holes.push({ x: x - left, y: y - top, width: Math.min(right, o.right) - x, height: Math.min(bottom, o.bottom) - y });
         }
-        if (bottom - top > 8 && right - left > 8) rect = { x: left, y: top, width: right - left, height: bottom - top };
+        if (bottom - top > 8 && right - left > 8) rect = { x: left, y: top, width: right - left, height: bottom - top, holes };
       }
-      const key = rect ? `${Math.round(rect.x)},${Math.round(rect.y)},${Math.round(rect.width)},${Math.round(rect.height)}` : 'hidden';
+      const key = rect ? [rect, ...rect.holes].map(b => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)},${Math.round(b.height)}`).join(';') : 'hidden';
       if (key !== last) { last = key; void bridge.place(rect).catch(() => {}); }
     };
     measure();

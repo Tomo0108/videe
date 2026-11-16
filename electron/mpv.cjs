@@ -38,6 +38,12 @@ class ChildWindow {
     this.create = user32.func('CreateWindowExW', 'intptr_t', ['uint32', 'str16', 'str16', 'uint32', 'int', 'int', 'int', 'int', 'intptr_t', 'intptr_t', 'intptr_t', 'intptr_t']);
     this.setPos = user32.func('SetWindowPos', 'bool', ['intptr_t', 'intptr_t', 'int', 'int', 'int', 'int', 'uint32']);
     this.destroyWindow = user32.func('DestroyWindow', 'bool', ['intptr_t']);
+    this.setRegion = user32.func('SetWindowRgn', 'int', ['intptr_t', 'intptr_t', 'bool']);
+    const gdi32 = loadKoffi().load('gdi32.dll');
+    this.rectRegion = gdi32.func('CreateRectRgn', 'intptr_t', ['int', 'int', 'int', 'int']);
+    this.combineRegion = gdi32.func('CombineRgn', 'int', ['intptr_t', 'intptr_t', 'intptr_t', 'int']);
+    this.deleteObject = gdi32.func('DeleteObject', 'bool', ['intptr_t']);
+    this.regionKey = '';
     // WS_CHILD | WS_CLIPSIBLINGS | SS_BLACKRECT. A STATIC control without SS_NOTIFY lets mouse
     // input fall through to the page underneath, so clicks and the cursor keep working.
     this.hwnd = this.create(0, 'STATIC', '', 0x40000000 | 0x04000000 | 0x4, 0, 0, 1, 1, parentHandle, 0, 0, 0);
@@ -50,6 +56,22 @@ class ChildWindow {
     if (!rect) { if (this.visible) this.setPos(this.hwnd, 0, 0, 0, 0, 0, 0x10 | 0x200 | 0x80 | 0x1 | 0x2); this.visible = false; return; }
     this.setPos(this.hwnd, 0, rect.x, rect.y, Math.max(1, rect.width), Math.max(1, rect.height), 0x10 | 0x200 | 0x40);
     this.visible = true;
+    this.cut(rect.holes || []);
+  }
+  /** Cuts the page's bars (controls, header) out of the window, so they show over the video without resizing it. */
+  cut(holes) {
+    const key = holes.map(h => `${h.x},${h.y},${h.width},${h.height}`).join(';');
+    if (key === this.regionKey) return;
+    this.regionKey = key;
+    if (!holes.length) { this.setRegion(this.hwnd, 0, true); return; }
+    const region = this.rectRegion(-1, -1, 100000, 100000);
+    for (const h of holes) {
+      const hole = this.rectRegion(h.x, h.y, h.x + h.width, h.y + h.height);
+      this.combineRegion(region, region, hole, 4); // RGN_DIFF
+      this.deleteObject(hole);
+    }
+    // The window owns the region from here on.
+    this.setRegion(this.hwnd, region, true);
   }
   destroy() { try { this.destroyWindow(this.hwnd); } catch { /* Already gone with the window. */ } }
 }
@@ -191,7 +213,8 @@ class MpvEngine {
     if (!this.child) return;
     if (!rect || this.win.isDestroyed()) { this.child.place(null); return; }
     const scale = this.win.webContents.getZoomFactor() * screen.getDisplayMatching(this.win.getBounds()).scaleFactor;
-    this.child.place({ x: Math.round(rect.x * scale), y: Math.round(rect.y * scale), width: Math.round(rect.width * scale), height: Math.round(rect.height * scale) });
+    const px = box => ({ x: Math.round(box.x * scale), y: Math.round(box.y * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale) });
+    this.child.place({ ...px(rect), holes: (rect.holes || []).map(px) });
   }
 
   async stop() {

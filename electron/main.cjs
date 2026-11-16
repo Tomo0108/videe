@@ -375,7 +375,13 @@ app.whenReady().then(async () => {
   });
   register('mpv-set', async (name, value) => { if (mpv) await mpv.set(String(name), value); });
   register('mpv-command', async (name, args) => { if (mpv) return mpv.command(String(name), args); });
-  register('mpv-place', rect => { if (!mpv) return; const ok = rect && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(rect[key])); mpv.place(ok ? rect : null); });
+  register('mpv-place', rect => {
+    if (!mpv) return;
+    const box = value => !!value && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(value[key]));
+    if (!box(rect)) { mpv.place(null); return; }
+    const holes = Array.isArray(rect.holes) ? rect.holes.filter(box).slice(0, 8) : [];
+    mpv.place({ x: rect.x, y: rect.y, width: rect.width, height: rect.height, holes });
+  });
   register('mpv-stop', async () => { await mpv?.stop(); });
   register('forget-video', async id => { if (processJob?.id === id) throw new Error('Cancel the conversion before removing this video.'); if (liveJob?.id === id) stopLive(); const entry = registry[id]; if (entry?.converted) await fs.rm(entry.converted, { force: true }); delete registry[id]; await persist(); });
   register('set-language', async value => {
