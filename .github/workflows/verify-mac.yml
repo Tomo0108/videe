@@ -1,0 +1,36 @@
+name: Verify macOS build
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/project-thread-u0utth]
+jobs:
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:fixtures
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:desktop
+      - run: node scripts/verify-fallback.mjs
+        env:
+          SCREENSHOT: mac-mkv.png
+      - run: npm run package:mac
+      - name: Launch the packaged app
+        run: |
+          APP=$(ls -d release/mac*/Videe.app | head -1)
+          codesign --verify --deep --strict "$APP"
+          "$APP/Contents/MacOS/Videe" & PID=$!
+          sleep 15
+          kill -0 $PID && echo "Packaged app is running"
+          kill $PID
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-verification
+          path: mac-mkv.png
