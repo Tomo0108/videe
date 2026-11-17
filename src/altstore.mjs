@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.33': 'On Windows, the normal title bar is back, now without the icon and app name that the app’s own header already shows.',
   '0.1.32': 'On Windows, the title bar is gone: the minimize, maximize and close buttons now sit in the top-right corner of the app’s own header, so the icon and name no longer appear twice.',
   '0.1.31': 'MKV and other videos whose picture the app can decode (HEVC, H.264, AV1, VP9) now play in the built-in player at their original quality: repackaged as they play, never re-encoded, with exact seeking and nothing written to disk. On Windows this removes the stutter and tearing lines; the mpv engine is kept only for older formats such as MPEG-2 and VC-1.',
   '0.1.30': 'On Windows, MKV and other videos playing with the built-in mpv engine are smooth again, with no stutter and no tearing lines.',

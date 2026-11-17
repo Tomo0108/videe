@@ -270,10 +270,24 @@ function buildMenu() {
   const send = action => { if (win && !win.isDestroyed()) { showWindow(); win.webContents.send('menu-action', action); } };
   Menu.setApplicationMenu(Menu.buildFromTemplate(i18n.macMenuTemplate(send)));
 }
+// Windows: keep the title bar and its buttons, but leave out the icon and the app's name, which the
+// page's own header already shows. The taskbar keeps both.
+function hideCaption(target) {
+  if (process.platform !== 'win32') return;
+  try {
+    const koffi = require('koffi');
+    const setAttribute = koffi.load('uxtheme.dll').func('SetWindowThemeAttribute', 'int32', ['intptr_t', 'int', 'void *', 'uint32']);
+    const handle = target.getNativeWindowHandle();
+    const hwnd = handle.length >= 8 ? handle.readBigInt64LE(0) : BigInt(handle.readInt32LE(0));
+    const options = Buffer.alloc(8);
+    options.writeUInt32LE(3, 0); // WTNCA_NODRAWCAPTION | WTNCA_NODRAWICON
+    options.writeUInt32LE(3, 4); // mask
+    setAttribute(hwnd, 1 /* WTA_NONCLIENT */, options, 8);
+  } catch (error) { console.warn('Could not hide the title bar caption', error); }
+}
 function createWindow() {
-  // Windows: no title bar (the page's header already shows the app's name and icon); only the
-  // minimize / maximize / close buttons stay, drawn over the header's top-right corner.
-  win = new BrowserWindow({ ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : process.platform === 'win32' ? { titleBarStyle: 'hidden', titleBarOverlay: { color: '#00000000', symbolColor: '#3f3f46', height: 40 } } : {}), width: 1440, height: 940, minWidth: 800, minHeight: 640, title: 'Videe', backgroundColor: '#fafafa', icon: join(__dirname, '../dist/icon.png'), webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  win = new BrowserWindow({ ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : {}), width: 1440, height: 940, minWidth: 800, minHeight: 640, title: 'Videe', backgroundColor: '#fafafa', icon: join(__dirname, '../dist/icon.png'), webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  hideCaption(win);
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
@@ -392,8 +406,6 @@ app.whenReady().then(async () => {
     return `videe://live/${id}?t=${at.toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
-  // The page tells the window buttons which color to draw in (light or dark backgrounds).
-  register('title-bar-colors', dark => { if (process.platform === 'win32' && win && !win.isDestroyed()) try { win.setTitleBarOverlay({ color: '#00000000', symbolColor: dark ? '#f4f4f5' : '#3f3f46' }); } catch { /* Older Windows without the overlay. */ } });
   register('mpv-available', () => mpvEnabled());
   register('mpv-open', async (id, options) => {
     const entry = registry[id];

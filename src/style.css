@@ -79,10 +79,6 @@ svg { flex-shrink: 0; }
    the header stops dragging too. */
 dialog, dialog * { -webkit-app-region: no-drag; }
 .native-mac:has(dialog[open]) .app-header { -webkit-app-region: no-drag; }
-/* Windows: the window's own buttons sit over the header's top-right corner (no title bar). */
-.native-win .app-header { padding-right: 150px; -webkit-app-region: drag; }
-.native-win .app-header button, .native-win .app-header input, .native-win .app-header a, .native-win .app-header select { -webkit-app-region: no-drag; }
-.native-win:has(dialog[open]) .app-header { -webkit-app-region: no-drag; }
 .brand { display: flex; align-items: center; gap: 10px; user-select: none; }
 .brand img { width: 30px; height: 30px; border-radius: 9px; box-shadow: 0 0 0 1px #ffffff26; }
 .brand span { line-height: var(--leading-title3); font-size: var(--type-title3); font-weight: 600; letter-spacing: normal; }
