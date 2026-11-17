@@ -271,7 +271,9 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(i18n.macMenuTemplate(send)));
 }
 function createWindow() {
-  win = new BrowserWindow({ ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : {}), width: 1440, height: 940, minWidth: 800, minHeight: 640, title: 'Videe', backgroundColor: '#fafafa', icon: join(__dirname, '../dist/icon.png'), webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  // Windows: no title bar (the page's header already shows the app's name and icon); only the
+  // minimize / maximize / close buttons stay, drawn over the header's top-right corner.
+  win = new BrowserWindow({ ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : process.platform === 'win32' ? { titleBarStyle: 'hidden', titleBarOverlay: { color: '#00000000', symbolColor: '#3f3f46', height: 40 } } : {}), width: 1440, height: 940, minWidth: 800, minHeight: 640, title: 'Videe', backgroundColor: '#fafafa', icon: join(__dirname, '../dist/icon.png'), webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
@@ -390,6 +392,8 @@ app.whenReady().then(async () => {
     return `videe://live/${id}?t=${at.toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
+  // The page tells the window buttons which color to draw in (light or dark backgrounds).
+  register('title-bar-colors', dark => { if (process.platform === 'win32' && win && !win.isDestroyed()) try { win.setTitleBarOverlay({ color: '#00000000', symbolColor: dark ? '#f4f4f5' : '#3f3f46' }); } catch { /* Older Windows without the overlay. */ } });
   register('mpv-available', () => mpvEnabled());
   register('mpv-open', async (id, options) => {
     const entry = registry[id];

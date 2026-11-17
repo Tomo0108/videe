@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('videe', {
   platform: process.platform,
+  titleBarColors: dark => ipcRenderer.invoke('title-bar-colors', !!dark),
   getGpuStatus: () => ipcRenderer.invoke('get-gpu-status'),
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   importFiles: files => ipcRenderer.invoke('import-paths', files.map(file => webUtils.getPathForFile(file)).filter(Boolean)),

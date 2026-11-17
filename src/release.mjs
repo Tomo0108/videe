@@ -1,5 +1,5 @@
 export const RELEASE_REPO = 'Tomo0108/videe';
-export const RELEASE_VERSION = '0.1.31';
+export const RELEASE_VERSION = '0.1.32';
 /** CFBundleVersion for an iOS build: 0.1.23 → 123. AltStore compares it with the source's buildVersion. */
 export function iosBuildNumber(version = RELEASE_VERSION) {
   const [major = 0, minor = 0, patch = 0] = String(version).split('.').map(Number);

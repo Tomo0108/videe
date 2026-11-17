@@ -806,6 +806,15 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [playing, engine, active?.id, active?.native, prefs.smooth, minimized, switchEngine]);
   // ---- Built-in mpv engine (Windows) -------------------------------------
+  // Windows draws its window buttons over the header: light symbols on the dark player, dark ones on a light library.
+  useEffect(() => {
+    if (window.videe?.platform !== 'win32' || !window.videe.titleBarColors) return;
+    const sync = () => { void window.videe?.titleBarColors?.(watching || document.documentElement.classList.contains('dark')).catch(() => {}); };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, [watching]);
   // A repackaged stream lives as long as the source it feeds.
   useEffect(() => { if (!source.startsWith('blob:')) { mse.current?.dispose(); mse.current = null; } }, [source]);
   useEffect(() => { void window.videe?.mpv?.available().then(ok => { mpvReady.current = !!ok; }).catch(() => {}); }, []);
@@ -1149,7 +1158,7 @@ export default function App() {
   const LocationIcon = currentCollection ? (currentCollection.kind === 'playlist' ? ListVideo : Folder) : Layers;
   const showFolders = !scope && view === 'all' && !query && folders.length > 0;
   const hoverFrame = hover && filmstrip.length ? filmstrip[Math.min(filmstrip.length - 1, Math.floor(hover.pct / 100 * filmstrip.length))] : null;
-  return <div className={`app-shell ${watching ? 'watching' : 'browsing'} ${window.videe?.platform === 'darwin' ? 'native-mac' : ''}`}
+  return <div className={`app-shell ${watching ? 'watching' : 'browsing'} ${window.videe?.platform === 'darwin' ? 'native-mac' : window.videe?.platform === 'win32' ? 'native-win' : ''}`}
     onDragEnter={e => { e.preventDefault(); if(controlsLocked)return; if(e.dataTransfer.types.includes('Files')) { dragDepth.current++; setDragging(true); } }}
     onDragOver={e => e.preventDefault()}
     onDragLeave={e => { e.preventDefault(); if(--dragDepth.current <= 0) { dragDepth.current=0; setDragging(false); } }}
