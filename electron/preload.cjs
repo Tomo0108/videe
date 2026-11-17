@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('videe', {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
   getSource: id => ipcRenderer.invoke('get-source', id),
   analyzeVideo: id => ipcRenderer.invoke('analyze-video', id),
-  liveSource: (id, start, hardware) => ipcRenderer.invoke('live-source', id, start, hardware),
+  liveSource: (id, start, hardware, repack) => ipcRenderer.invoke('live-source', id, start, hardware, repack),
   stopLive: () => ipcRenderer.invoke('stop-live'),
   mpv: {
     available: () => ipcRenderer.invoke('mpv-available'),

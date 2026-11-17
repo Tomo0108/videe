@@ -1,5 +1,6 @@
 import {ChoiceMenu} from './ChoiceMenu';
 import {Modal} from './Modal';
+import { mseStream, type MseStream } from './live-mse';
 import { MpvMedia } from './mpv-media';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowDownWideNarrow, ArrowUp, Camera, Check, LockKeyholeOpen, LockKeyhole, Loader2, Repeat, Repeat1, LayoutGrid, List, Info, SkipBack, ArrowLeft, Captions, Film, Folder, FolderOpen, Gauge, Layers, ListVideo, Maximize, Minimize, Pause, PictureInPicture2, Play, RotateCcw, Rewind, FastForward, Scissors, Search, Settings2, SkipForward, Trash2, Upload, Volume2, VolumeX, X, Zap, ZoomIn, ZoomOut, ChevronDown, ChevronRight, Ellipsis, Clock3, Heart, CircleHelp, BookOpen, Sparkles } from 'lucide-react';
@@ -100,7 +101,7 @@ export default function App() {
   const [isFullscreen,setIsFullscreen] = useState(false);
   const [videoZoom,setVideoZoom] = useState(1); const [videoPan,setVideoPan] = useState({x:0,y:0});
   // Playback engine: direct decoding, or FFmpeg live conversion for formats that stutter or fail.
-  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0); const mpvMedia = useRef<MpvMedia | null>(null); const mpvReady = useRef(false); const mpvBlocked = useRef(new Set<string>()); const mpvRetried = useRef(new Set<string>()); const mpvSurface = useRef<HTMLDivElement>(null); const mediaHandlers = useRef<Record<string, () => void>>({});
+  const [engine,setEngine] = useState<Engine>('direct'); const engineRef = useRef<Engine>('direct'); const liveOffset = useRef(0); const mpvMedia = useRef<MpvMedia | null>(null); const mpvReady = useRef(false); const mpvBlocked = useRef(new Set<string>()); const mpvRetried = useRef(new Set<string>()); const mse = useRef<MseStream | null>(null); const noRepack = useRef(new Set<string>()); const mpvSurface = useRef<HTMLDivElement>(null); const mediaHandlers = useRef<Record<string, () => void>>({});
   const [analysis,setAnalysis] = useState<Analysis|null>(null); const analysisRef = useRef<Analysis|null>(null);
   const [frameStats,setFrameStats] = useState<{dropped:number;total:number}|null>(null);
   const [osd,setOsd] = useState(''); const osdTimer = useRef(0);
@@ -255,7 +256,9 @@ export default function App() {
     const sequence = openSequence.current;
     // Windows: the built-in mpv engine plays the file as it is, with no conversion and nothing on disk.
     const bridge = window.videe.mpv;
-    if (bridge && mpvReady.current && !mpvBlocked.current.has(id)) {
+    // mpv is only for pictures the player can't decode; the rest is repackaged at full quality.
+    const repackable = analysisRef.current?.plan.mode === 'remux' && !analysisRef.current?.converted && !noRepack.current.has(id) && typeof MediaSource !== 'undefined';
+    if (bridge && mpvReady.current && !mpvBlocked.current.has(id) && !repackable) {
       mpvMedia.current?.dispose();
       const media = new MpvMedia(bridge, id);
       mpvMedia.current = media;
@@ -268,10 +271,27 @@ export default function App() {
       return sequence === openSequence.current;
     }
     try {
-      const src = await window.videe.liveSource(id, at, prefsRef.current.hardware);
+      const src = await window.videe.liveSource(id, at, prefsRef.current.hardware, repackable);
       if (sequence !== openSequence.current) return false;
       // Another video became active meanwhile: drop this stream without leaving a spinner behind.
       if (activeRef.current !== id) { setLoading(false); return false; }
+      mse.current?.dispose(); mse.current = null;
+      // A repackaged stream (the original picture, not re-encoded) starts at the keyframe before `at` (k).
+      // Played through Media Source at its real place in the file, it lands on `at` exactly.
+      const keyframe = Number(/[?&]copy=1&k=([\d.]+)/.exec(src)?.[1]);
+      if (Number.isFinite(keyframe)) {
+        const stream = mseStream(src, keyframe, durationRef.current || analysisRef.current?.info.duration || 0, () => (mse.current === stream ? videoRef.current : null), reason => {
+          // The player can't take this stream: convert it the usual way instead.
+          if (mse.current !== stream || activeRef.current !== id) return;
+          console.warn('Videe: repackaged stream not playable, converting instead:', reason);
+          noRepack.current.add(id); void startLive(id, now(), playAfterLoad.current || !videoRef.current?.paused);
+        });
+        mse.current = stream;
+        liveOffset.current = 0; engineRef.current = 'live'; setEngine('live');
+        pendingSeek.current = null; seekOnLoad.current = at; playAfterLoad.current = play; setError(''); setLoading(true); setPosition(at); lastPositionPaint.current = at;
+        setSource(stream.url);
+        return true;
+      }
       liveOffset.current = at; engineRef.current = 'live'; setEngine('live');
       pendingSeek.current = null; playAfterLoad.current = play; setError(''); setLoading(true); setPosition(at); lastPositionPaint.current = at;
       setSource(src);
@@ -508,6 +528,11 @@ export default function App() {
       const length = durationRef.current;
       if (!length) return;
       const target = clampTime(seconds, length);
+      // Inside what a repackaged stream has already delivered, the player seeks by itself.
+      if (mse.current && pendingSeek.current === null) {
+        const ranges = video.buffered;
+        for (let i = 0; i < ranges.length; i++) if (target >= ranges.start(i) && target <= ranges.end(i) - 0.3) { video.currentTime = target; setPosition(target); lastPositionPaint.current = target; return; }
+      }
       if (Math.abs(target - (pendingSeek.current ?? now())) < 0.02) return;
       const play = pendingSeek.current !== null ? playAfterLoad.current : !video.paused;
       pendingSeek.current = target; playAfterLoad.current = play; setPosition(target); lastPositionPaint.current = target;
@@ -781,6 +806,8 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [playing, engine, active?.id, active?.native, prefs.smooth, minimized, switchEngine]);
   // ---- Built-in mpv engine (Windows) -------------------------------------
+  // A repackaged stream lives as long as the source it feeds.
+  useEffect(() => { if (!source.startsWith('blob:')) { mse.current?.dispose(); mse.current = null; } }, [source]);
   useEffect(() => { void window.videe?.mpv?.available().then(ok => { mpvReady.current = !!ok; }).catch(() => {}); }, []);
   useEffect(() => {
     // Read the live engine, not this render's: a newer video may already be opening in mpv.
@@ -873,6 +900,7 @@ export default function App() {
     if (!live && active?.native && analysisRef.current?.info.video && !video.videoWidth && window.videe?.liveSource) {
       void switchEngine('live', t('Converting video for playback')); return;
     }
+    if (live && seekOnLoad.current !== null) { video.currentTime = seekOnLoad.current; seekOnLoad.current = null; }
     if (!live) {
       if (seekOnLoad.current !== null) { video.currentTime = clampTime(seekOnLoad.current, finiteDuration); setPosition(video.currentTime); seekOnLoad.current = null; }
       else if (first) {
@@ -1114,7 +1142,7 @@ export default function App() {
     return () => { media.removeEventListener('change', syncDark); reducedMotion.removeEventListener('change', syncMotion); };
   }, [prefs.theme, prefs.motion]);
   const timeText = (seconds: number) => prefs.timecode ? timecode(seconds, fps) : timeLabel(seconds);
-  const engineLabel = engine === 'live' ? t('Smooth playback') : analysis?.converted === 'edited' ? t('Edited copy') : '';
+  const engineLabel = engine === 'live' && !source.startsWith('blob:') ? t('Smooth playback') : analysis?.converted === 'edited' ? t('Edited copy') : '';
   const jobPercent = conversion !== null && conversionTotal ? Math.min(100, conversion / conversionTotal * 100) : 0;
   const blockingJob = conversion !== null && jobKind !== 'export';
   const locationName = currentCollection ? currentCollection.name : view === 'continue' ? t('Continue watching') : view === 'favorites' ? t('Favorites') : t('All videos');

@@ -9,7 +9,7 @@ import ffmpeg from 'ffmpeg-static';
 // keeps it on the built-in mpv engine; it never drops to live conversion.
 const userData = await mkdtemp(join(tmpdir(), 'videe-mpv-reopen-'));
 const mkv = join(userData, 'clip.mkv');
-const made = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=640x360:r=25:d=20', '-f', 'lavfi', '-i', 'sine=f=440:d=20', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'ac3', mkv]);
+const made = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=s=640x360:r=25:d=20', '-f', 'lavfi', '-i', 'sine=f=440:d=20', '-c:v', 'mpeg2video', '-q:v', '4', '-c:a', 'ac3', mkv]);
 assert.equal(made.status, 0, String(made.stderr));
 const app = await electron.launch({ args: ['.'], env: { ...process.env, VIDEE_TEST_USER_DATA: userData, VIDEE_LANG: 'en', ...(process.platform === 'linux' ? { VIDEE_MPV: '1', VIDEE_MPV_NODE: process.env.VIDEE_MPV_NODE || 'node' } : {}) } });
 const page = await app.firstWindow(); const errors = []; page.on('pageerror', e => errors.push(e.message));

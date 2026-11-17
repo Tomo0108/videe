@@ -239,6 +239,43 @@ export function liveArgs(input, start, info, encoder = 'libx264') {
   ];
 }
 
+/** Audio codecs the player decodes inside fragmented MP4. */
+const MP4_AUDIO = new Set(['aac', 'mp3', 'flac', 'opus']);
+
+/**
+ * ffmpeg arguments for live playback without re-encoding: the original video stream is repackaged
+ * as fragmented MP4 from the keyframe at or before `start`, so the picture keeps its full quality and
+ * the player decodes it (with the GPU). Audio the player can't decode is converted to AAC.
+ */
+export function liveCopyArgs(input, start, info) {
+  const seek = Math.max(0, Number(start) || 0);
+  const hevc = info?.video?.codec === 'hevc';
+  const audio = info?.audio?.[0];
+  return [
+    '-hide_banner', '-nostdin', '-loglevel', 'error',
+    ...(seek > 0 ? ['-ss', seek.toFixed(3)] : []),
+    '-i', input,
+    '-map', '0:V:0?', '-map', '0:a:0?', '-sn', '-dn',
+    '-c:v', 'copy', ...(hevc ? ['-tag:v', 'hvc1'] : []),
+    ...(audio && MP4_AUDIO.has(audio.codec) ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '256k', '-ac', '2']),
+    '-f', 'mp4', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-frag_duration', '500000',
+    'pipe:1',
+  ];
+}
+
+/** Arguments that print the time of the keyframe a copy stream from `start` begins at (framecrc). */
+export function keyframeProbeArgs(input, start) {
+  return ['-hide_banner', '-nostdin', '-loglevel', 'error', '-copyts', '-ss', Math.max(0, Number(start) || 0).toFixed(3), '-i', input, '-map', '0:V:0', '-c', 'copy', '-frames:v', '1', '-f', 'framecrc', '-'];
+}
+
+/** The first packet's time in seconds from framecrc output, or NaN. */
+export function parseKeyframeProbe(text) {
+  const tb = /^#tb 0: (\d+)\/(\d+)/m.exec(text || '');
+  const line = /^0,\s*(-?\d+),/m.exec(text || '');
+  if (!tb || !line) return NaN;
+  return Number(line[1]) * Number(tb[1]) / Number(tb[2]);
+}
+
 /** ffmpeg arguments for a stream-copy remux into a seekable MP4. */
 export function remuxArgs(input, plan, info) {
   const hevc = info?.video?.codec === 'hevc';

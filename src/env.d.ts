@@ -19,7 +19,7 @@ declare global {
       importFiles(files: File[]): Promise<MediaItem[]>;
       getSource(id: string): Promise<string>;
       analyzeVideo(id: string): Promise<Analysis>;
-      liveSource(id: string, start: number, hardware?: boolean): Promise<string>;
+      liveSource(id: string, start: number, hardware?: boolean, repack?: boolean): Promise<string>;
       stopLive(): Promise<void>;
       mpv?: MpvBridge;
       useOriginal(id: string): Promise<void>;

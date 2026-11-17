@@ -149,6 +149,20 @@ async function analyzeNow(id, read = ffmpegProbe) {
 // byte range) are refused so they can't kill the stream that is playing now.
 let liveToken = '', liveCounter = 0;
 function stopLive() { if (liveJob) { liveJob.stopped = true; liveJob.child?.kill('SIGKILL'); liveJob = undefined; } }
+/** Time of the keyframe a stream-copy from `start` begins at, or NaN when it can't be told. */
+async function keyframeBefore(input, start) {
+  const { keyframeProbeArgs, parseKeyframeProbe } = await media();
+  return new Promise(resolve => {
+    const child = spawn(ffmpegBinary(), keyframeProbeArgs(input, start), { windowsHide: true });
+    let text = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => { text += chunk; });
+    child.stderr.resume();
+    child.on('error', () => { clearTimeout(timer); resolve(NaN); });
+    child.on('close', () => { clearTimeout(timer); resolve(parseKeyframeProbe(text)); });
+  });
+}
 async function liveResponse(request, id, start, hardware, token) {
   const entry = registry[id];
   if (!entry) return new Response('Not found', { status: 404 });
@@ -156,10 +170,11 @@ async function liveResponse(request, id, start, hardware, token) {
   if (token !== liveToken || (range && Number(range[1]) > 0)) return new Response('Stream replaced', { status: 410 });
   const input = entry.path;
   await fs.access(input);
-  const { liveArgs } = await media();
+  const { liveArgs, liveCopyArgs } = await media();
   const { value } = entry.probe || {};
   const info = value?.info || (await analyze(id)).info;
-  const encoder = hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
+  const copy = new URL(request.url).searchParams.get('copy') === '1';
+  const encoder = copy ? 'copy' : hardware ? (await hardwareEncoder()) || 'libx264' : 'libx264';
   // A newer seek may have arrived while the file was being checked.
   if (token !== liveToken || request.signal.aborted) return new Response('Stream replaced', { status: 410 });
   stopLive();
@@ -168,14 +183,14 @@ async function liveResponse(request, id, start, hardware, token) {
   liveJob = job;
   const run = encoder => {
     let sent = false;
-    const child = spawn(ffmpegBinary(), liveArgs(input, start, info, encoder), { windowsHide: true });
+    const child = spawn(ffmpegBinary(), encoder === 'copy' ? liveCopyArgs(input, start, info) : liveArgs(input, start, info, encoder), { windowsHide: true });
     job.child = child;
     child.stdout.on('data', chunk => { sent = true; if (!out.write(chunk)) { child.stdout.pause(); out.once('drain', () => child.stdout.resume()); } });
     child.stderr.resume();
     child.on('error', () => out.destroy(new Error('Could not start the playback engine.')));
     child.on('close', code => {
       if (job.stopped) { out.destroy(); return; }
-      if (code !== 0 && !sent && encoder !== 'libx264') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
+      if (code !== 0 && !sent && encoder !== 'libx264' && encoder !== 'copy') { encoderPromise = Promise.resolve(''); run('libx264'); return; }
       out.end();
     });
   };
@@ -355,12 +370,24 @@ app.whenReady().then(async () => {
   register('take-opened-files', async () => { rendererReady = true; const files = openQueue.splice(0); return files.length ? importPaths(files) : []; });
   register('get-source', async id => { const entry = registry[id]; if (!entry) throw new Error('File not found. Please add it again.'); await fs.access(entry.converted || entry.path); return `videe://media/${id}`; });
   register('analyze-video', async id => analyze(id));
-  register('live-source', async (id, start, hardware = true) => {
+  register('live-source', async (id, start, hardware = true, repack = false) => {
     const entry = registry[id];
     if (!entry) throw new Error('File not found. Please add it again.');
     await fs.access(entry.path);
+    const at = Math.max(0, Number(start) || 0);
     const n = `${Date.now()}-${++liveCounter}`; liveToken = `${id}:${n}`;
-    return `videe://live/${id}?t=${Math.max(0, Number(start) || 0).toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
+    // Videos whose picture the player can decode (HEVC, H.264, AV1… in MKV and the like) are only
+    // repackaged, never re-encoded. The stream then starts at the keyframe before `start`; the page
+    // is told where that is (k) and moves on to the exact time itself.
+    const plan = entry.probe?.value?.plan;
+    if (repack === true && plan?.mode === 'remux' && entry.probe.value.info?.video && !entry.converted) {
+      const keyframe = at > 0 ? await keyframeBefore(entry.path, at) : 0;
+      if (Number.isFinite(keyframe) && keyframe <= at + 0.001) {
+        const k = Math.max(0, keyframe);
+        return `videe://live/${id}?t=${at.toFixed(3)}&copy=1&k=${k.toFixed(3)}&n=${n}`;
+      }
+    }
+    return `videe://live/${id}?t=${at.toFixed(3)}&hw=${hardware ? 1 : 0}&n=${n}`;
   });
   register('stop-live', () => { liveToken = ''; stopLive(); });
   register('mpv-available', () => mpvEnabled());
