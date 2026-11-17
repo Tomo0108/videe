@@ -26,6 +26,7 @@ function compareVersions(a, b) {
 }
 
 const NOTES = {
+  '0.1.31': 'MKV and other videos whose picture the app can decode (HEVC, H.264, AV1, VP9) now play in the built-in player at their original quality: repackaged as they play, never re-encoded, with exact seeking and nothing written to disk. On Windows this removes the stutter and tearing lines; the mpv engine is kept only for older formats such as MPEG-2 and VC-1.',
   '0.1.30': 'On Windows, MKV and other videos playing with the built-in mpv engine are smooth again, with no stutter and no tearing lines.',
   '0.1.29': 'On Windows, fast motion and scene changes in videos playing with the built-in mpv engine no longer tear.',
   '0.1.28': 'On Windows, interlaced videos (TV and camcorder recordings) playing with the built-in mpv engine are deinterlaced, so they no longer flicker.',
